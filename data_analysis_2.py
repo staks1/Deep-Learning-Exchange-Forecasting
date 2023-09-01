@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from functools import reduce
+import os 
 
 
 
@@ -35,7 +36,6 @@ def standardize(data):
         standardized.append( (data[col] - meanc )/ stdc)
     standardized_data = pd.DataFrame(standardized).transpose()
     return standardized_data   
-
 
 
 
@@ -77,7 +77,7 @@ def create_nested_dict(data):
         
         
 # for a certain year , for a certain currency plot the monthy series of this currency (one subplot per month of the year)
-def plot_one_year_one_currency(year_dict,data,year,currency):
+def plot_one_year_one_currency(year_dict,data,year,currency,save=False):
     # total plots 
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(15, 10))  # 3x4 grid for subplots
     #select currency from dataset 
@@ -99,21 +99,28 @@ def plot_one_year_one_currency(year_dict,data,year,currency):
     #general title for whole plot     
     plt.suptitle(f"Time Series Observations for Year {year}", fontsize=16)
     plt.tight_layout()
-    plt.show()
-
+    #plt.show()
+    # close plot 
+    #plt.close()
+    
+    
+    
+    # save image (optional)
+    if(save):
+        save_image(fig,currency,year)
 
 
 # same as above but do it for all currencies (17 currencies -> 17 plots )
-def plot_one_year_all_currencies(year_dict,data,year):
+def plot_one_year_all_currencies(year_dict,data,year,save=False):
     for cu in data.columns:
-        plot_one_year_one_currency(year_dict,data,year,cu)
+        plot_one_year_one_currency(year_dict,data,year,cu,save)
     
 
 
 
 # plot all years one currency 
 
-def plot_all_years_one_currency(year_dict,data,currency):
+def plot_all_years_one_currency(year_dict,data,currency,save=False):
     # total plots 
     fig, axes = plt.subplots(nrows=5, ncols=5, figsize=(15, 10))  # 3x4 grid for subplots
     #select currency from dataset 
@@ -121,7 +128,7 @@ def plot_all_years_one_currency(year_dict,data,currency):
     
     # for each month 
     inyear = data.index.min().year
-    for year in range(1, 25):
+    for year in range(1, 26):
         row = (year - 1) // 5  # Determine row index
         col = (year - 1) % 5   # Determine column index
         
@@ -142,10 +149,34 @@ def plot_all_years_one_currency(year_dict,data,currency):
         inyear += 1
         
     #general title for whole plot     
-    plt.suptitle(f"Time Series Observations for All years", fontsize=16)
+    plt.suptitle(f"Time Series Observations for All years - {currency}", fontsize=16)
     plt.tight_layout()
-    plt.show()
+    #plt.show()
+    #plt.close()
+    
+    if(save):
+        # i use 25 to denote that we plot all the years 
+        save_image(fig,currency,25)
+    
+    # save image (optional)
+    
+    
 
+# function to plot all years for all currencies 
+def plot_all_years_all_currencies(year_dict,data,save=False):
+    for cur in data.columns:
+            plot_all_years_one_currency(year_dict, data, cur,save)
+    
+    
+
+
+# function to save images 
+def save_image(fig,currency,year):
+    if not (os.path.exists('plots')):
+            os.makedirs('plots')
+    plt.savefig(os.path.join('plots', currency + ' ' +str(year) +  '-forecast.png'))
+    plt.close()
+    
 
 
 
@@ -162,17 +193,38 @@ if __name__=="__main__" :
         standardized_data = standardize(data)
         
         #create nested dict
-        y_dict = create_nested_dict(standardized_data)
+        # run with data or standardized_data
+        y_dict = create_nested_dict(data)
         
         
         #run plot_one_year_all_currencies to plot for a certain year all the currencies monthly plots 
-        #plot_one_year_all_currencies(y_dict,standardized_data,2023)
+        #plot_one_year_all_currencies(y_dict,standardized_data,1999,save=False)
         
+        #------------------------------------------------------#
+        '''
+        plot_one_year_all_currencies(y_dict,data,2018,save=True)
+        plot_one_year_all_currencies(y_dict,data,2019,save=True)
+        plot_one_year_all_currencies(y_dict,data,2020,save=True)
+        plot_one_year_all_currencies(y_dict,data,2021,save=True)
+        plot_one_year_all_currencies(y_dict,data,2022,save=True)
+        plot_one_year_all_currencies(y_dict,data,2023,save=True)
+        '''
+        #-----------------------------------------------------#
         
         # it is easy to plot all the years and all the currencies as well 
         # but we get 17 * 25 = 425 plots so not really feasible 
         # i believe with the above we can focus on the years we need 
         # TODO : create another function that plots all the years for one currency , if we need to focus and study a currency in particular 
         
-        #plot all years for a certain currency 
-        plot_all_years_one_currency(y_dict, data, 'USD')
+        
+        
+        #plot all years for all currencies  
+        plot_all_years_all_currencies(y_dict,data,True)
+      
+        
+        
+        
+        
+        # let's transpose the series to make them more compatible with the cnn models created 
+        all_series = standardized_data.transpose()
+        
