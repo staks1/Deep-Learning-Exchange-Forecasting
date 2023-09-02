@@ -12,6 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from functools import reduce
 import os 
+import keras as ks
 
 # import statsmodels as well
 import statsmodels.api as sm
@@ -22,7 +23,11 @@ from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 from statsmodels.tsa.seasonal import seasonal_decompose  # to split the time series into components
 import statsmodels.tsa.api as smt
 
-
+from fetch_data import download_zip, unzip_and_rename
+from process_data import clean_data, resample_data
+from utils import *
+from build_model import *
+from collections import namedtuple
 
 
 
@@ -263,7 +268,7 @@ if __name__=="__main__" :
         #all_series_T = standardized_data.transpose()
         
         # transpose data series 
-        # if we need to feed them to the models later 
+        #if we need to feed them to the models later 
         data_T = data.transpose()
         
         
@@ -271,6 +276,9 @@ if __name__=="__main__" :
         # instead of all days for each year 
         # it calculates the 1st day of each month for all years 
         # by using the resample function 
+        
+        
+        # --- resample the data to get monthly/daily/weekly ---
         all_series_resampled = data.resample('MS').mean()
         
         # plot a subset of the new monthly sampled observations for all years 
@@ -278,7 +286,8 @@ if __name__=="__main__" :
         
         
         # plot all currencies for all years (but sampling one day for each month of the year)
-        plot_all_currencies_monthly(all_series_resampled,296,17,False,True)
+        # --- comment to skip plots ---
+        #plot_all_currencies_monthly(all_series_resampled,296,17,False,True)
         
         
         
@@ -287,9 +296,142 @@ if __name__=="__main__" :
         # and then build different models for eacg frequency based on the cnn models i have built
         # i can start with the daily model , because we already have the original daily series of all years and currencies 
         
+    
         
-        # ---------------------------------- START WITH THIS -------------------------------------------------#
-        #TODO : run the cnn daily model for a chosen horizon to predict daily forecasts for the original series 
+        # Let's now read all the different frequency - datasets 
+        # for each frequency we take the end of the month 
+        frequencies = {
+            'daily': 'D',
+            'weekly': 'W',
+            'monthly': 'M',
+            'quarterly': 'Q',
+            'yearly': 'Y'
+        }
+        
+        
+        # Create the output folder if it does not exist
+        # also make generator for later to read each dataset sequentially 
+        # add to dictionary the datasets 
+    
+        for freq_name, freq_code in frequencies.items():
+            data = pd.read_csv(f"/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset/{freq_name}.csv")
+            frequencies[freq_name] = (frequencies[freq_name],data)
+            
+            
+        # let's start with the daily dataset 
+        daily_series = frequencies['daily'][1]
+        
+        
+        # transpose to fit into model
+        daily_series_T = daily_series.transpose()
+        
+        # it works but i need to have years on the ticks 
+        #plot_all_currencies_monthly(daily_series, 6000, 17,False,False)
+        
+        
+        #-------------- BEGIN TRAINING ---------------------------------------#
+        
+        # function not created yet 
+        # to create the models for each frequency 
+        models = build_Model()
+        
+        
+        
+        ###############################################
+        #------------ BEGIN TRAINING LOOP ------------#
+        ###############################################
+        
+        for m in models :
+            
+            # read series corresponding to frequency 
+            series = frequencies[m.freq_name][1]
+            series = series.transpose()
+            
+            
+            # train for all the training_lengths set on the models #
+            # one model for each training_length #
+            for series_length in m.training_lengths:
+                
+        
+                ################################################
+                #------------ SPLITTING DATASET ---------------#
+                ################################################
+                # create the array to keep all the train series
+                # create the new array of series 
+                all_series = np.zeros((series.shape[0], m.series_length + m.horizon ))
+        
+        
+                #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+                # fill all the training_series with the data from the original series 
+                # i make here the assumption that we have : number_of_available_values_in_series > series_length  + horizon 
+                # which makes sense since here we have around 6000 daily observations ~ around 16.3 years which is plenty 
+                # if for some reason i need to set a very high series_length + horizon and it so happens that number_of_available_values_in_series > series_length  + horizon 
+                # i will use the methods of btrotta to extend each series in the all_series array with data from the original series picked from the corresponding period tp fill the missing values 
+                # but for now i assume we have enough series_length + horizon values from all currency series 
+                # so we fill each series in the all_series array with series_length + horizon values , starting from the end of the series to get the latest data of course 
+                # Also i will probably add the option to augment (add more rows for each series ) later, in case we don't have enough data 
+                #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+                
+                
+                # fill new array of series 
+                all_series[:,:] = daily_series_T[:, :-(series_length + m.horizon)]
+                
+                # set x,y train (training + horizon )        
+                x_train = all_series[:,:-m.horizon]
+                y_train = all_series[:,-m.horizon:]
+                
+                # train for each horizon 
+                for horizon_step in horizon :
+                    
+                    # read only one horizon step as y_train
+                    cur_y_train = y_train[:,horizon_step]
+                    
+                    # set up tensorflow 
+                    # clear session and reset default graph, as suggested here, to speed up training
+                    # https://stackoverflow.com/questions/45796167/training-of-keras-model-gets-slower-after-each-repetition
+                    ks.backend.clear_session()
+                    #tf.reset_default_graph()
+                    tf.compat.v1.reset_default_graph()
+    
+                    # set random seeds as described here:
+                    # https://keras.io/getting-started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development
+                    
+                    # create keras session #
+                    np.random.seed(0)
+                    session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+                    tf.compat.v1.set_random_seed(0)
+                    tf_session = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
+                    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=session_conf)
+                    
+                    ###########################
+                    #--instantiate the model--# 
+                    ###########################
+                    # TODO : FIX  ERROR HERE  
+                    mod = m.model_constructor()
+                    
+                    # for daily use these parameters for now !
+                    # of course i will test many parameters 
+                    cur_model,epochs,batch_size = mod(series_length,7,3,20,250,1000)
+        
+                    # train 
+                    # set up parameters 
+                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=batch_size, shuffle=True, validation_split=0.1,
+                        callbacks=[ks.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=10)])
+                    
+                    
+                    # plot Loss for this horizon step 
+                    plotLoss(history,horizon_step,series_length,model.freq_name)
+                    
+                    #########################
+                    #----save the model ----#
+                    #########################
+                    if not os.path.exists('trained_models'):
+                            os.mkdir('trained_models')
+                        model_file = os.path.join('trained_models',
+                                                  '{}_length_{}_step_{}.h5'.format(m.freq_name, series_length,
+                                                                                     m.horizon_step))
+                        # save model 
+                        cur_model.save(model_file)
         
         
         
