@@ -112,6 +112,9 @@ def destandardize(data,means,stds):
 '''
 
 
+# standardize values 
+# takes shape of [observations,series]
+# returns shape of [series,observations]
 def standardize(data):
     standardized = []    
     # save the old mean, std to destandardize later 
@@ -150,8 +153,8 @@ def destandardize(data,means,stds):
     destandardized_data = pd.DataFrame(destandardized)
         
     #standardized_data = pd.DataFrame(standardized).transpose()
-    return destandardized_data    
-    
+    return destandardized_data
+
 
 
 
@@ -295,51 +298,6 @@ def save_image(fig,currency,year):
     
 
 
-'''
-# set up custom callbacks to get the losses update 
-class PlotLearning(ks.callbacks.Callback):
-    """
-    Callback to plot the learning curves of the model during training.
-    """
-    
-    
-    def on_train_begin(self, logs={}):
-        self.metrics = {}
-        for metric in logs:
-            self.metrics[metric] = []
-            
-
-    def on_epoch_end(self, epoch, logs={}):
-        # Storing metrics
-        for metric in logs:
-            if metric in self.metrics:
-                self.metrics[metric].append(logs.get(metric))
-            else:
-                self.metrics[metric] = [logs.get(metric)]
-        
-        # Plotting
-        metrics = [x for x in logs if 'val' not in x]
-        
-        
-        
-        f, axs = plt.subplots(1, len(metrics), figsize=(15,5))
-        clear_output(wait=True)
-        
-        for i, metric in enumerate(metrics):
-            axs[i].plot(range(1, epoch + 2), self.metrics[metric],label=metric)
-            
-            
-            # validation 
-            if logs['val_' + metric]:
-                    axs[i].plot(range(1, epoch + 2),self.metrics['val_' + metric],label='val_' + metric)
-                
-            axs[i].legend()
-            axs[i].grid()
-
-        plt.tight_layout()
-        #plt.show()
-        plt.savefig(os.path.join('plots', str(epoch)  +  '-forecast.png'))
-'''    
 
 
 # only called as main for testing 
@@ -349,13 +307,13 @@ if __name__=="__main__" :
         
         
         
-        
+        '''
         # standardize 
         #standardized_data = standardize(data)
         
         #create nested dict
         # run with data or standardized_data
-        y_dict = create_nested_dict(data)
+        #y_dict = create_nested_dict(data)
         
         
         #run plot_one_year_all_currencies to plot for a certain year all the currencies monthly plots 
@@ -385,7 +343,7 @@ if __name__=="__main__" :
         
         # transpose data series 
         #if we need to feed them to the models later 
-        data_T = data.transpose()
+        #data_T = data.transpose()
         
         
         # let's try to do some resampling into the data 
@@ -395,7 +353,7 @@ if __name__=="__main__" :
         
         
         # --- resample the data to get monthly/daily/weekly ---
-        all_series_resampled = data.resample('MS').mean()
+        #all_series_resampled = data.resample('MS').mean()
         
         # plot a subset of the new monthly sampled observations for all years 
         #plot_Series(all_series_resampled,296,1,False)
@@ -411,6 +369,7 @@ if __name__=="__main__" :
         # so i build the monthly/weekly/quarterly/yearly/ series of the dataset 
         # and then build different models for eacg frequency based on the cnn models i have built
         # i can start with the daily model , because we already have the original daily series of all years and currencies 
+        '''
         
     
         
@@ -481,7 +440,8 @@ if __name__=="__main__" :
             series = frequencies[m.freq_name][1]
             # standardize is used 
             series,_,_ = standardize(series)
-            series = series.transpose()
+            
+            #series = series.transpose()
             
             
             # train for all the training_lengths set on the models #
@@ -545,7 +505,6 @@ if __name__=="__main__" :
                     ###########################
                     #--instantiate the model--# 
                     ###########################
-                    # TODO : FIX  ERROR HERE  
             
                     
                     # for daily use these parameters for now !
@@ -579,7 +538,11 @@ if __name__=="__main__" :
                     # maybe add pl1 in callbacks
                     # maybe add model_checkpoint_callback
                     # try with one series each time 
-                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=1, shuffle=True, validation_split=0.1,
+                    # -----------------------------------------------------------------------------------------------------------#
+                    # ------------------ I NEED TO CHANGE VALIDATION_SPLIT TO 0.2 ~ 0.3 -----------------------------------------#
+                    #------------------------------------------------------------------------------------------------------------#
+                    # or set batch_size = 1 
+                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=20, shuffle=True, validation_split=0.3,
                         callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=100)])
                     
                     
@@ -589,10 +552,10 @@ if __name__=="__main__" :
                     #########################
                     #----save the model ----#
                     #########################
-                    if not os.path.exists('../trained_models'):
-                            os.mkdir('../trained_models')
+                    if not os.path.exists('../trained_models'+'/'+ m.freq_name):
+                            os.mkdir('../trained_models' + '/'+ m.freq_name)
                             
-                    model_file = os.path.join('../trained_models',
+                    model_file = os.path.join('../trained_models',m.freq_name,
                                                   '{}_length_{}_step_{}.h5'.format(m.freq_name, series_length,
                                                                                      horizon_step))
                     # save model 
