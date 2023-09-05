@@ -207,7 +207,8 @@ def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,b
 
 
 
-
+# old model
+'''
 def weekly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
 
     # if we make the assumption of full year (with february + 1 day)
@@ -307,15 +308,159 @@ def weekly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
         epochs = 250
         batch_size = 1000
     return est, epochs, batch_size
+'''
 
+
+# new weekly model 
+def weekly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
+
+    # if we make the assumption of full year (with february + 1 day)
+    if series_length == 13:
+        
+        
+        # Reshape into (X,1)
+        input = ks.layers.Input((series_length,))
+        weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+
+
+        # ------ Try only with a convolutional model -----------#
+        
+        # both 2 last weeks influence 
+        # we get (None,1,2,32)  // how much each week influences the result
+        # convolutional on  groups of 4 weeks (in each group we take the last week as well)
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,3), padding = 'valid',use_bias=True,)(weekly_input)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+        
+    
+        #adding pairs of 2 successive weeks history 
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        
+        
+        
+        # stack on top convolutional of 3 successive weeks after conv2
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        
+        
+        # addd conv, 2 successive pairs with stride = 1 on top 
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        
+        
+
+        # add conv , 3 successive pairs with stride = 1 on top
+        conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+        
+        
+        
+        # now we have 3 units 
+        # we will flatten them and feed to a fully connected network
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+        
+        
+        # concatenate both outputs 
+        # we get shape (None,2)
+        comb = tf.keras.layers.Concatenate()([fc_1,output1])
+        
+        # weighted combination of both the outputs 
+        #comb_output = Weighted_add(1)(comb)
+        output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
+        
+    elif (series_length == 26) :
+        
+        
+        # Reshape into (X,1)
+        input = ks.layers.Input((series_length,))
+        weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+
+    
+        # ------ Try only with a convolutional model -----------#
+        
+        # groups of 4 weeks --> first output 
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,3), padding = 'valid',use_bias=True,)(weekly_input)
+        conv1b = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,3), padding = 'valid',use_bias=True,)(conv1)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1b))
+        
+        # second convolutional model 
+        #adding pairs of 2 successive weeks history 
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        # addd conv, 2 successive pairs with stride = 1 on top 
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        
+        # add conv , 3 successive pairs with stride = 1 on top
+        conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+        conv6 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,3),padding = 'valid' ,use_bias = True)(conv5)
+        conv7 = ks.layers.Conv2D(filters = 64, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv6)
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv7))
+        
+        comb = tf.keras.layers.Concatenate()([fc_1,output1])
+        
+        # weighted combination of both the outputs 
+        #comb_output = Weighted_add(1)(comb)
+        
+        output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
+        
+    elif (series_length == 52) :
+        
+
+        # Reshape into (X,1)
+        input = ks.layers.Input((series_length,))
+        weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+
+
+        # ------ Try only with a convolutional model -----------#
+        
+        # groups of 4 weeks --> first output 
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,3), padding = 'valid',use_bias=True,)(weekly_input)
+        conv1b = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,3), padding = 'valid',use_bias=True,)(conv1)
+        conv1c = ks.layers.Conv2D(filters = 32,kernel_size=(1,3),strides = (1,1), padding = 'valid',use_bias=True,)(conv1b)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1c))
+        
+        
+        # second convolutional model 
+        #adding pairs of 2 successive weeks history 
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        # addd conv, 2 successive pairs with stride = 1 on top 
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        
+        # add conv , 3 successive pairs with stride = 1 on top
+        conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+        conv6 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,3),padding = 'valid' ,use_bias = True)(conv5)
+        conv7 = ks.layers.Conv2D(filters = 64, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv6)
+        conv8 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,3),padding = 'valid' ,use_bias = True)(conv7)
+        #conv9 = ks.layers.Conv2D(filters = 64, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv8)
+        
+        
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv8))
+        
+        comb = tf.keras.layers.Concatenate()([fc_1,output1])
+        
+        # weighted combination of both the outputs 
+        #comb_output = Weighted_add(1)(comb)
+        
+        output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)    
+    
+    
+    est = ks.Model(inputs=input, outputs=output)
+    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
+    epochs = 250
+    batch_size = 1000    
+ 
+        
+    return est, epochs, batch_size
 
 
 
 # i start from daily model 
+'''  old model (sos)
 def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
+    
+    
     
     input = ks.layers.Input((series_length,))
     weekly_input = ks.layers.Reshape((series_length,1))(input)
+    
+    
     
     
     # naive model 
@@ -326,18 +471,33 @@ def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
     
     
+    
+    
+    
+    # add simple regression parameters (single layer perceptron)
+    # maybe test higher powers 
+    y_linear_reg = ks.layers.Dense(units=1,activation = 'linear')(input)
+    
+    y_linear_reg = ks.layers.BatchNormalization()(y_linear_reg)
+    
     # weekly avg # 
     weekly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(weekly_input)
-    weekly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(weekly_avg))
-    weekly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(weekly_hidden1)
-    weekly_output = ks.layers.Dense(units=1, activation='linear')(weekly_hidden2)
+    
+    
+    weekly_avg = ks.layers.BatchNormalization()(weekly_avg)
+    
+    #weekly_hidden1 = ks.layers.Dense(units=series_length, activation='relu')(ks.layers.Flatten()(weekly_avg))
+    weekly_hidden1 = ks.layers.Dense(units=series_length, activation='relu')(weekly_avg)
+    weekly_output = ks.layers.Dense(units=1, activation='linear')(weekly_hidden1)
     # average upsampling 
     weekly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(weekly_avg)
     
     
-    
+
     # subtract from the naive solution the average and not from the original series 
     periodic_diff = ks.layers.Subtract()([weekly_input,weekly_avg_up])
+    
+    periodic_diff = ks.layers.BatchNormalization()(periodic_diff)
     
     
     # tensor and convolution 
@@ -349,19 +509,84 @@ def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
     periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
     
+    #periodic_output = ks.layers.BatchNormalization()(periodic_output)
     
     
-    # output 
     #output = ks.layers.Add()([weekly_output, periodic_output,naive_output])
-    output = tf.keras.layers.Average()([weekly_output, periodic_output,naive_output])
+    #output = tf.keras.layers.Average()([weekly_output, periodic_output,y_linear_reg])
+    output = tf.keras.layers.Add()([weekly_output , naive_output])
+    
     
     est = ks.Model(inputs=input, outputs=output)
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
+    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
     
-    epochs = 250
-    batch_size = 1000
+    
+    
+    epochs = epochs
+    batch_size =  bs
     return est, epochs, batch_size
+'''
 
+# new convolutional daily model 
+def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
+    
+    
+    
+    input = ks.layers.Input((series_length,))
+    weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+    
+    
+    
+    # ------ Try only with a convolutional model -----------#
+    
+    # both 2 last weeks influence 
+    # we get (None,1,2,32)  // how much each week influences the result
+    conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,7),strides = (1,7), padding = 'valid',use_bias=True,)(weekly_input)
+    fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+    
+    
+    #adding pairs of 2 successive days history 
+    conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+    
+    # stack on top convolutional of 3 successive days after conv2
+    conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+    
+    
+    # addd conv, 2 successive pairs with stride = 1 on top 
+    conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+    
+    
+    # add conv , 3 successive pairs with stride = 1 on top
+    conv5 = ks.layers.Conv2D(filters = 128, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+    
+    # now we have 3 units 
+    # we will flatten them and feed to a fully connected network
+    output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+    
+    
+    # concatenate both outputs 
+    # we get shape (None,2)
+    comb = tf.keras.layers.Concatenate()([fc_1,output1])
+    
+    # weighted combination of both the outputs 
+    #comb_output = Weighted_add(1)(comb)
+    
+    output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
+    
+    
+    #output = ks.layers.Add()([weekly_output, periodic_output,naive_output])
+    #output = tf.keras.layers.Average()([weekly_output, periodic_output,y_linear_reg])
+    #output = tf.keras.layers.Add()([weekly_output , naive_output])
+    
+    
+    est = ks.Model(inputs=input, outputs=output)
+    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
+    
+    
+    
+    epochs = epochs
+    batch_size =  bs
+    return est, epochs, batch_size
 
 
 
@@ -524,11 +749,20 @@ def build_Model():
     
     
     # just for testing i comment out the other models to run only the daily model 
-    daily = Model('Daily', 14, 1, daily_model, [98,364], 7, True)
-    monthly = Model('Monthly', 18, 12, monthly_model, [48, 120, 240], 12, False)
-    yearly = Model('Yearly', 6, 1, yearly_model, [10, 20, 30], 1, False)
-    quarterly = Model('Quarterly', 8, 4, quarterly_model, [20, 48, 100], 4, False)
-    weekly = Model('Weekly', 13, 1, weekly_model, [52, 520, 1040], 52, True)
-    hourly = Model('Hourly', 48, 24, hourly_model, [672], 7*24, True)
+    # we give those training lengths for training 
+    # use training length --> 1 week,2 weeks,3 weeks,1 month, 2 months, 3 months ,1 year 
+    daily = Model('daily', 14, 1, daily_model, [7,14,21,28,56,84,364], 7, True)
+    #daily = Model('daily', 14, 1, daily_model, [7], 7, True)
+    
+    # we rougly predict 3 months so 
+    # use training length --> 4 weeks, 8 weeks , 13 weeks, 52 weeks , 
+    weekly = Model('weekly', 13, 1, weekly_model, [13,26,52], 52, True)
+    
+    monthly = Model('monthly', 18, 12, monthly_model, [48, 120, 240], 12, False)
+    yearly = Model('yearly', 6, 1, yearly_model, [10, 20, 30], 1, False)
+    quarterly = Model('quarterly', 8, 4, quarterly_model, [20, 48, 100], 4, False)
+    
+   
+    hourly = Model('hourly', 48, 24, hourly_model, [672], 7*24, True)
     # return [daily,monthly,quarterly,weekly,hourly,yearly]
-    return [daily]
+    return [weekly]
