@@ -28,7 +28,8 @@ from process_data import clean_data, resample_data
 from utils import *
 from build_model import *
 from collections import namedtuple
-
+import tensorflow as tf 
+from IPython.display import clear_output
 
 
 # function to plot resampled momthly (mean of all month) observations for all years for all currencies 
@@ -72,15 +73,85 @@ def plot_Series(data,size,num_currencies,ann=False):
 
 
 # standardize values 
+'''
 def standardize(data):
     standardized = []    
-    # dol = data['USD']
+    # save the old mean, std to destandardize later 
+    means = []
+    stds = []
+    
+    
     for col in data.columns:
         stdc = data[col].std()
         meanc = data[col].mean()
+        # append the means/stds
+        means.append(meanc)
+        stds.append(stdc)
+        
         standardized.append( (data[col] - meanc )/ stdc)
+        
+    # transpose to the original form 
     standardized_data = pd.DataFrame(standardized).transpose()
-    return standardized_data   
+    return standardized_data , means , stds 
+
+
+
+# destandardize to get the original data 
+def destandardize(data,means,stds):
+    # get the original orientation 
+    data = data.transpose()
+    
+    destandardized = [] 
+    
+    for i,col in enumerate(data.columns):
+        destandardized.append(data[col]*stds[i] + means[i])
+        
+    #standardized_data = pd.DataFrame(standardized).transpose()
+    return destandardized
+        
+'''
+
+
+def standardize(data):
+    standardized = []    
+    # save the old mean, std to destandardize later 
+    means = []
+    stds = []
+    
+    
+    for col in data.columns:
+        stdc = data[col].std()
+        meanc = data[col].mean()
+        # append the means/stds
+        means.append(meanc)
+        stds.append(stdc)
+        
+        standardized.append( (data[col] - meanc )/ stdc)
+        
+    # transpose to the original form 
+    standardized_data = pd.DataFrame(standardized)
+    return standardized_data , means , stds 
+
+
+
+
+# destandardize to get the original data 
+# takes shape of [series,observations]
+# returns shape of [series,observations]
+def destandardize(data,means,stds):
+    # get the original orientation 
+    data = data.transpose()
+    
+    destandardized = [] 
+    
+    for i,col in enumerate(data.columns):
+        destandardized.append(data[col]*stds[i] + means[i])
+        
+    destandardized_data = pd.DataFrame(destandardized)
+        
+    #standardized_data = pd.DataFrame(standardized).transpose()
+    return destandardized_data    
+    
 
 
 
@@ -224,6 +295,51 @@ def save_image(fig,currency,year):
     
 
 
+'''
+# set up custom callbacks to get the losses update 
+class PlotLearning(ks.callbacks.Callback):
+    """
+    Callback to plot the learning curves of the model during training.
+    """
+    
+    
+    def on_train_begin(self, logs={}):
+        self.metrics = {}
+        for metric in logs:
+            self.metrics[metric] = []
+            
+
+    def on_epoch_end(self, epoch, logs={}):
+        # Storing metrics
+        for metric in logs:
+            if metric in self.metrics:
+                self.metrics[metric].append(logs.get(metric))
+            else:
+                self.metrics[metric] = [logs.get(metric)]
+        
+        # Plotting
+        metrics = [x for x in logs if 'val' not in x]
+        
+        
+        
+        f, axs = plt.subplots(1, len(metrics), figsize=(15,5))
+        clear_output(wait=True)
+        
+        for i, metric in enumerate(metrics):
+            axs[i].plot(range(1, epoch + 2), self.metrics[metric],label=metric)
+            
+            
+            # validation 
+            if logs['val_' + metric]:
+                    axs[i].plot(range(1, epoch + 2),self.metrics['val_' + metric],label='val_' + metric)
+                
+            axs[i].legend()
+            axs[i].grid()
+
+        plt.tight_layout()
+        #plt.show()
+        plt.savefig(os.path.join('plots', str(epoch)  +  '-forecast.png'))
+'''    
 
 
 # only called as main for testing 
@@ -235,7 +351,7 @@ if __name__=="__main__" :
         
         
         # standardize 
-        standardized_data = standardize(data)
+        #standardized_data = standardize(data)
         
         #create nested dict
         # run with data or standardized_data
@@ -314,7 +430,7 @@ if __name__=="__main__" :
         # add to dictionary the datasets 
     
         for freq_name, freq_code in frequencies.items():
-            data = pd.read_csv(f"/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset/{freq_name}.csv")
+            data = pd.read_csv(f"/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset/{freq_name}.csv",index_col='Date')
             frequencies[freq_name] = (frequencies[freq_name],data)
             
             
@@ -331,10 +447,28 @@ if __name__=="__main__" :
         
         #-------------- BEGIN TRAINING ---------------------------------------#
         
+        
+        
+        # define callback 
+        # to save only the best model (with min loss)
+        # this hiners training so i deactivated it for now
+        checkpoint_filepath = '../checkpoint'
+        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath,
+        save_weights_only=False,
+        monitor='val_loss',
+        mode='min',
+        save_best_only=True)
+        
+        
+        # let's create the logs to get the loss updates 
+        logs = {
+            'loss' : 0.1
+            }
+        
         # function not created yet 
         # to create the models for each frequency 
         models = build_Model()
-        
         
         
         ###############################################
@@ -345,6 +479,8 @@ if __name__=="__main__" :
             
             # read series corresponding to frequency 
             series = frequencies[m.freq_name][1]
+            # standardize is used 
+            series,_,_ = standardize(series)
             series = series.transpose()
             
             
@@ -358,7 +494,7 @@ if __name__=="__main__" :
                 ################################################
                 # create the array to keep all the train series
                 # create the new array of series 
-                all_series = np.zeros((series.shape[0], m.series_length + m.horizon ))
+                all_series = np.zeros((series.shape[0], series_length + m.horizon ))
         
         
                 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -373,15 +509,18 @@ if __name__=="__main__" :
                 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
                 
                 
+                
+                
                 # fill new array of series 
-                all_series[:,:] = daily_series_T[:, :-(series_length + m.horizon)]
+                all_series[:,:] = series.iloc[:, -(series_length + m.horizon):]
                 
                 # set x,y train (training + horizon )        
                 x_train = all_series[:,:-m.horizon]
                 y_train = all_series[:,-m.horizon:]
                 
                 # train for each horizon 
-                for horizon_step in horizon :
+                # should we use range here ?? 
+                for horizon_step in range(m.horizon) :
                     
                     # read only one horizon step as y_train
                     cur_y_train = y_train[:,horizon_step]
@@ -401,37 +540,63 @@ if __name__=="__main__" :
                     session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
                     tf.compat.v1.set_random_seed(0)
                     tf_session = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
-                    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=session_conf)
+                    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=session_conf))
                     
                     ###########################
                     #--instantiate the model--# 
                     ###########################
                     # TODO : FIX  ERROR HERE  
-                    mod = m.model_constructor()
+            
                     
                     # for daily use these parameters for now !
                     # of course i will test many parameters 
-                    cur_model,epochs,batch_size = mod(series_length,7,3,20,250,1000)
+                    
+                    mod=m.model_constructor
+                    # call daily model for now 
+                    # build different model based on the frequency 
+                    
+                    #----------------------------------------------------------------------#
+                    if(m.freq_name=='daily'):
+                        # test -- > set batch = 1 
+                        cur_model,epochs,batch_size = mod(series_length,7,3,250,400,20)
+                    elif(m.freq_name == 'weekly'):
+                        cur_model,epochs,batch_size = mod(series_length,52,4,52,250,1000)
+                    elif(m.freq_name == 'monthly'):
+                        cur_model,epochs,batch_size = mod(series_length,12,6,50,250,1000)
+                    elif(m.freq_name == 'quarterly'):
+                        cur_model,epochs,batch_size = mod(series_length,4,4,50,250,1000)
+                    else :
+                        # 'Yearly'
+                        cur_model,epochs,batch_size = mod(series_length,2,4,20,250,1000)
+                    #-----------------------------------------------------------------------#
         
                     # train 
                     # set up parameters 
-                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=batch_size, shuffle=True, validation_split=0.1,
-                        callbacks=[ks.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=10)])
+                    # checkpoint --> save best model 
+                    # early_stopping 
+                    
+                    #pl1 = PlotLearning()
+                    # maybe add pl1 in callbacks
+                    # maybe add model_checkpoint_callback
+                    # try with one series each time 
+                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=1, shuffle=True, validation_split=0.1,
+                        callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=100)])
                     
                     
                     # plot Loss for this horizon step 
-                    plotLoss(history,horizon_step,series_length,model.freq_name)
+                    plotLoss(history,horizon_step,series_length,m.freq_name)
                     
                     #########################
                     #----save the model ----#
                     #########################
-                    if not os.path.exists('trained_models'):
-                            os.mkdir('trained_models')
-                        model_file = os.path.join('trained_models',
+                    if not os.path.exists('../trained_models'):
+                            os.mkdir('../trained_models')
+                            
+                    model_file = os.path.join('../trained_models',
                                                   '{}_length_{}_step_{}.h5'.format(m.freq_name, series_length,
-                                                                                     m.horizon_step))
-                        # save model 
-                        cur_model.save(model_file)
+                                                                                     horizon_step))
+                    # save model 
+                    cur_model.save(model_file)
         
         
         
