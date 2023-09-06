@@ -18,131 +18,62 @@ import datetime as dt
 import os
 
 
-
-# file to create all the models simulaneously
-# define model for hourly predictions #
-def hourly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
-    
-    
-    ########### layers gets feature_size = series_length ##########
+def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     input = ks.layers.Input((series_length,))
-    
-    # create the vector( N,1)
-    weekly_input = ks.layers.Reshape((series_length, 1))(input)
-    
-    ############ average pooling ####################
-    # why do we use 168 for pool_size ? maybe test other values 
-    # firs pool 168 = 24 x 7 --> so we actually pool weeks [week1,week2,week3....weekN]
-    weekly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(weekly_input)
-    
-    # linear dense layers 
-    # first flatten, then pass through linear layers 
-    weekly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(weekly_avg))
-    weekly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(weekly_hidden1)
-    
-    
-    # one output 
-    # the output of all weeks together --> an aggregate 
-    #############################################################################
-    weekly_output = ks.layers.Dense(units=1, activation='linear')(weekly_hidden2)
-    #############################################################################
-    
-    
-    # ---------- differences -------------- #
-    
-    # upsampling 
-    weekly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(weekly_avg)
+    weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+
+    # 4 quarters
+    if(series_length == 4):
+            conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,4), padding = 'valid',use_bias=True,)(weekly_input)
+            fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+            #adding pairs of 2 successive months history
+            conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+            conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+            output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv3))
+
+    elif(series_length == 8):
+            conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,4), padding = 'valid',use_bias=True,)(weekly_input)
+            fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+            #adding pairs of 2 successive months history
+            conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+            conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+            conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+            conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+            output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+    else:
+            # 12,24,36
+            conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,4), padding = 'valid',use_bias=True,)(weekly_input)
+            fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+            #adding pairs of 2 successive months history
+            conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+            # stack on top convolutional of 3 successive days after conv2
+            conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+            # addd conv, 2 successive pairs with stride = 1 on top
+            # or maybe add kernel 1,3 instead again
+            conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+            conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+            output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
 
 
-
-
-    ######################### calculate weekly_difference : input - weekly_avg_up ##########
-    # hourly - weekly_avg 
-    daily_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(weekly_avg_up)  ])
+    # concatenate both outputs
+    # we get shape (None,2)
+    comb = tf.keras.layers.Concatenate()([fc_1,output1])
+    # weighted combination of both the outputs
+    output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
     
     
-    ############################## we created the difference between : (hour-corresponding_avg_week_data)
-    
-    
-    
-    
-    # reshape : what kind of reshape do we do here ???
-    
-    # change reshape here --> we can try other combinations instead of //7
-    daily_diff_input = ks.layers.Reshape((series_length // 7, 7, 1))(daily_diff)
-    
-    
-    # convolutional layers #
-    # try more filters 
-    # this gives (1,series_length//7,1,3) tensor 
-    # test also with more filters 
-    daily_diff_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, 7), strides=(1, 7),padding='valid')(daily_diff_input)
-    
-    
-    
-    
-    # linear dense layers 
-    # simple 20 outputs 
-    daily_diff_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(daily_diff_conv))
-    daily_diff_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(daily_diff_hidden1)
-    
-    # output 1 
-    #####################################################################################
-    daily_diff_output = ks.layers.Dense(units=1, activation='linear')(daily_diff_hidden2)
-    #####################################################################################
-    
-    ################# average poolong ################ 
-    
-    # we pool days now : [day1,day2....dayN]
-    daily_avg = ks.layers.AveragePooling1D(pool_size=24, strides=24, padding='valid')(weekly_input)
-    
-    daily_avg_up = ks.layers.UpSampling1D(size=24)(daily_avg)
-    
-    
-    # define hourly difference : input - daily_avg_up 
-    #(daily_avg - hourly )
-    # SO THEN from every hour we subtract a
-    hourly_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(daily_avg_up)])
-    hourly_diff_input = ks.layers.Reshape((series_length // 24, 24, 1))(hourly_diff)
-    
-    
-    # convolutional layers #
-    hourly_diff_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, 24), strides=(1, 24),padding='valid')(hourly_diff_input)
-    
-    # dense linear layers 
-    hourly_diff_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(hourly_diff_conv))
-    hourly_diff_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(hourly_diff_hidden1)
-    
-    ##########################################################################################
-    hourly_diff_output = ks.layers.Dense(units=1, activation='linear')(hourly_diff_hidden2)
-    #########################################################################################
-    
-    
-    
-    # add together weekly
-    # the monthly should be added in a smaller percentage 
-    output = ks.layers.Add()([weekly_output, daily_diff_output, hourly_diff_output])
-
-
-    ############### Build model #################
     est = ks.Model(inputs=input, outputs=output)
-    # use adam optimizer
-    # use lr = 0.01 
-    # use loss = mse
-    # use epochs = 250 
-    # bath size = 1000
+    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
     
-    # change also the learning_rate --> 0.0001  (default=0.001)
-    
-    ###################### DEFINE MODEL PARAMETERS ###################################
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
-    epochs = epochs  #60 # 40 # default 250 
-    batch_size = bs
+    epochs = epochs
+    batch_size =  bs
     return est, epochs, batch_size
     
     
-    
-
+'''
 def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     
     
@@ -192,7 +123,7 @@ def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,b
     periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
 
     # TODO : TEST WITH AND WITHOUT THE NAIVE ADDED
-    '''0.2 * naive_output''' 
+    
     #output = ks.layers.Add()([quarterly_output, periodic_output,naive_output ])
     
     # i also combine the naive solution and feed all the outputs into an average aggregate 
@@ -204,7 +135,7 @@ def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,b
     epochs = epochs
     batch_size = bs
     return est, epochs, batch_size
-
+'''
 
 
 # old model
@@ -589,7 +520,7 @@ def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     return est, epochs, batch_size
 
 
-
+'''
 def monthly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
 
 
@@ -658,6 +589,70 @@ def monthly_model(series_length,yearly_count,filter_count,units_count,epochs,bs)
     est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
     epochs = 250
     batch_size = 1000
+    return est, epochs, batch_size
+'''
+
+
+
+def monthly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
+
+    input = ks.layers.Input((series_length,))
+    weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+
+
+    # how much each month influences the result
+    if(series_length == 6):
+
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,6),strides = (1,6), padding = 'valid',use_bias=True,)(weekly_input)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+        #adding pairs of 2 successive months history
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        # stack on top convolutional of 3 successive days after conv2
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        # addd conv, 2 successive pairs with stride = 1 on top
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv4))
+
+
+    elif(series_length == 8):
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,8),strides = (1,8), padding = 'valid',use_bias=True,)(weekly_input)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+        #adding pairs of 2 successive months history
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv4))
+
+    else:
+        # 12,24,36
+        conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,6),strides = (1,6), padding = 'valid',use_bias=True,)(weekly_input)
+        fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+
+        #adding pairs of 2 successive months history
+        conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+        # stack on top convolutional of 3 successive days after conv2
+        conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+        # addd conv, 2 successive pairs with stride = 1 on top
+        conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,3),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+        conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+        # *** maybe add again the same layers as in 6 months case here
+
+        output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+
+
+    # concatenate both outputs
+    # we get shape (None,2)
+    comb = tf.keras.layers.Concatenate()([fc_1,output1])
+    # weighted combination of both the outputs
+    output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
+    
+    est = ks.Model(inputs=input, outputs=output)
+    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
+    
+    epochs = epochs
+    batch_size =  bs
     return est, epochs, batch_size
 
 
@@ -757,12 +752,10 @@ def build_Model():
     # we rougly predict 3 months so 
     # use training length --> 4 weeks, 8 weeks , 13 weeks, 52 weeks , 
     weekly = Model('weekly', 13, 1, weekly_model, [13,26,52], 52, True)
-    
-    monthly = Model('monthly', 18, 12, monthly_model, [48, 120, 240], 12, False)
+    # why 48 , 120 , 240 
+    monthly = Model('monthly', 18, 12, monthly_model, [6, 8, 12,24,36], 12, False)
     yearly = Model('yearly', 6, 1, yearly_model, [10, 20, 30], 1, False)
-    quarterly = Model('quarterly', 8, 4, quarterly_model, [20, 48, 100], 4, False)
+    quarterly = Model('quarterly', 8, 4, quarterly_model, [4, 8, 12], 4, False)
     
-   
-    hourly = Model('hourly', 48, 24, hourly_model, [672], 7*24, True)
     # return [daily,monthly,quarterly,weekly,hourly,yearly]
-    return [weekly]
+    return [quarterly]
