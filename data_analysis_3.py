@@ -519,11 +519,11 @@ if __name__=="__main__" :
                         # test -- > set batch = 1 
                         cur_model,epochs,batch_size = mod(series_length,7,3,250,400,20)
                     elif(m.freq_name == 'weekly'):
-                        cur_model,epochs,batch_size = mod(series_length,52,4,52,250,1000)
+                        cur_model,epochs,batch_size = mod(series_length,52,4,52,250,20)
                     elif(m.freq_name == 'monthly'):
-                        cur_model,epochs,batch_size = mod(series_length,12,6,50,250,1000)
+                        cur_model,epochs,batch_size = mod(series_length,12,6,50,250,20)
                     elif(m.freq_name == 'quarterly'):
-                        cur_model,epochs,batch_size = mod(series_length,4,4,50,250,1000)
+                        cur_model,epochs,batch_size = mod(series_length,4,4,50,65,20)
                     else :
                         # 'Yearly'
                         cur_model,epochs,batch_size = mod(series_length,2,4,20,250,1000)
@@ -542,7 +542,7 @@ if __name__=="__main__" :
                     # ------------------ I NEED TO CHANGE VALIDATION_SPLIT TO 0.2 ~ 0.3 -----------------------------------------#
                     #------------------------------------------------------------------------------------------------------------#
                     # or set batch_size = 1 
-                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=20, shuffle=True, validation_split=0.3,
+                    history = cur_model.fit(x_train, cur_y_train, epochs=epochs, batch_size=20, shuffle=True, validation_split=0.4,
                         callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=100)])
                     
                     
