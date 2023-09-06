@@ -278,14 +278,16 @@ if __name__=="__main__" :
             data = pd.read_csv(f"/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset/{freq_name}.csv",index_col='Date')
             frequencies[freq_name] = (frequencies[freq_name],data)
             
-            
-        # let's start with the daily dataset 
-        daily_series = frequencies['daily'][1]
         
-
-        #-------------- BEGIN TRAINING ---------------------------------------#
-        train_models_single_step(frequencies)
-        #---------------------------------------------------------------------#
+        #-------------- BEGIN TRAINING SINGLE STEP---------------------------------------#
+        #train_models_single_step(frequencies)
+        #--------------------------------------------------------------------------------#
+        
+        
+        
+        #-------------- BEGIN TRAINING MULTI STEP----------------------------------------#
+        train_models_multi_step(frequencies)
+        #--------------------------------------------------------------------------------#
         
                 
                     
