@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import glob
 from  build_model import *
+from build_multistep_model import * 
 
 
 
@@ -278,5 +279,96 @@ def train_single_step_cv(frequencies):
                             model_losses.append(mse)
                             
                             
+                     
                             
+                     
+# function to train multi time-step models
+# -> one single model predicts the whole horizon each time
+
+def train_models_multi_step(frequencies):
+    
+        # call build model to create the models 
+        # probably we need new model scrip here
+        # which will have the multi step models only
+        
+        models = build_m_Model()
+        
+        for m in models :
+            
+            # read series corresponding to frequency 
+            series = frequencies[m.freq_name][1]
+            # standardize is used 
+            series,_,_ = standardize(series)
+            
+            #series = series.transpose()
+            
+            
+            # train for all the training_lengths set on the models #
+            # one model for each training_length #
+            for series_length in m.training_lengths:
+                
+        
+                ################################################
+                #------------ SPLITTING DATASET ---------------#
+                ################################################
+                # create the array to keep all the train series
+                # create the new array of series 
+                all_series = np.zeros((series.shape[0], series_length + m.horizon ))
+        
+                
+                # fill new array of series 
+                all_series[:,:] = series.iloc[:, -(series_length + m.horizon):]
+                
+                # set x,y train (training + horizon )        
+                x_train = all_series[:,:-m.horizon]
+                y_train = all_series[:,-m.horizon:]
+                
+            
+               
+                ks.backend.clear_session()
+                tf.compat.v1.reset_default_graph()
+                # create keras session #
+                np.random.seed(0)
+                session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+                tf.compat.v1.set_random_seed(0)
+                tf_session = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
+                tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=session_conf))
+                
+                # call the model constructor
+                mod=m.model_constructor
+                
+                #------------Pick models' parameters-------------------------------------#
+                if(m.freq_name=='daily'):
+                    cur_model,epochs,batch_size = mod(series_length,7,3,250,400,20,m.horizon)
+                elif(m.freq_name == 'weekly'):
+                    cur_model,epochs,batch_size = mod(series_length,52,4,52,250,20,m.horizon)
+                elif(m.freq_name == 'monthly'):
+                    cur_model,epochs,batch_size = mod(series_length,12,6,50,250,20,m.horizon)
+                elif(m.freq_name == 'quarterly'):
+                    cur_model,epochs,batch_size = mod(series_length,4,4,50,65,20,m.horizon)
+                else :
+                    # 'Yearly'
+                    cur_model,epochs,batch_size = mod(series_length,2,4,20,400,20,m.horizon)
+                #-----------------------------------------------------------------------#
+                # set batch size = 20 
+                history = cur_model.fit(x_train, y_train, epochs=epochs, batch_size=20, shuffle=True, validation_split=0.3,
+                    callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=100)])
+                
+                
+                # plot Loss for this horizon step 
+                #plotLoss(history,horizon_step,series_length,m.freq_name)
+                
+                #########################
+                #----save the model ----#
+                #########################
+                #TODO : SHOULD FIX BUG HERE 
+                # IT CREATES ANOTHER DIRECTORY WITH CONCATENATED THE FREQUENCY AND 'MULTI_STEP'
+                if not os.path.exists('../trained_models'+ '/multi_step'+ m.freq_name):
+                        os.mkdir('../trained_models'+ '/multi_step'+ m.freq_name)
+                        
+                model_file = os.path.join('../trained_models','multi_step',m.freq_name,
+                                              '{}_length_{}.h5'.format(m.freq_name, series_length))
+                # save model 
+                cur_model.save(model_file) 
+                        
     
