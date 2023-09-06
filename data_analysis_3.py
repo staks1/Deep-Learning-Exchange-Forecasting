@@ -526,7 +526,7 @@ if __name__=="__main__" :
                         cur_model,epochs,batch_size = mod(series_length,4,4,50,65,20)
                     else :
                         # 'Yearly'
-                        cur_model,epochs,batch_size = mod(series_length,2,4,20,250,1000)
+                        cur_model,epochs,batch_size = mod(series_length,2,4,20,400,20)
                     #-----------------------------------------------------------------------#
         
                     # train 
