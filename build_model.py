@@ -657,82 +657,97 @@ def monthly_model(series_length,yearly_count,filter_count,units_count,epochs,bs)
 
 
 
-# define the yearly model
+# new quarterly model
 def yearly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
+        input = ks.layers.Input((series_length,))
+        weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
+        # 4 quarters
+        if(series_length == 2):
+                fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(weekly_input))
     
-    # different yearly_count depending on series length 
-    # for more years try to take longer intervals of past years 
-    '''
-    if(series_length == 10) :
-        yearly_count = 2
-    elif(series_length == 20):
-        yearly_count = 2
-    else :
-        yearly_count = 2
-    '''
-
-    # read the input shape
-    input = ks.layers.Input((series_length,))
-
-    # reshape into N x 1
-    yearly_input = ks.layers.Reshape((series_length, 1))(input)
-
-    # average pooling for k years
-    # 2 years period
-    yearly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='same')(yearly_input)
-
-    # define yearly diff
-    yearly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(yearly_avg)
-
-    # if the aggregates are more we pass them into a fcn to get the correct dimensions
-    # or we just drop the out of series_length values
-    #yearly_avg_up = yearly_avg_up[:,:series_length,:]
-
-
-
-
-    # also will modify the units for next training
-    # maybe add more units
-    yearly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(yearly_input))
-    yearly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(yearly_hidden1)
-    yearly_output = ks.layers.Dense(units=1, activation='linear')(yearly_hidden2)
-
-
-
-
-
-    # define yearly diff
-    yearly_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(yearly_avg_up)  ])
-
-
-    # reshape yearly_diff (check if it is correct)
-    yearly_diff_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(yearly_diff)
-
-
-    # add convolutional filter
-    # maybe run with 10 filters or 5 filters
-    yearly_diff_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),
-                                       padding='valid')(yearly_diff_input)
-
-    # hidden linear
-    yearly_diff_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(yearly_diff_conv))
-
-
-    # output 1
-    #####################################################################################
-    yearly_diff_output = ks.layers.Dense(units=1, activation='linear')(yearly_diff_hidden1)
-
-
-    # add yearly output with convolutional produced output to produce final output
-    output = ks.layers.Add()([yearly_output, yearly_diff_output])
-
-
-    est = ks.Model(inputs=input, outputs=output)
-    # change learning rate to 0.0001
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.001), loss='mse', metrics=['mse','accuracy'])
-    epochs =  epochs
-    batch_size = bs
-    return est, epochs, batch_size
+                #adding pairs of 2 years
+                # maybe we dont need this since it is still the same fcn from above -- > conv 2->1 or fcn 2 -> 1 ? they are the same
+                # conv1 and fc_1 here are the same
+                
+                conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,2),strides = (1,1), padding = 'valid',use_bias=True)(weekly_input)
+                output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+                comb = tf.keras.layers.Concatenate()([fc_1,output1])
+    
+    
+        elif(series_length == 3):
+                conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,3),strides = (1,3), padding = 'valid',use_bias=True)(weekly_input)
+                fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+    
+    
+                #adding pairs of 2 successive months history
+                conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+                conv3 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+                output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv3))
+                comb = tf.keras.layers.Concatenate()([fc_1,output1])
+                
+        elif(series_length == 6):
+                # using half a year weighting
+                # maybe use strides 3 instead of 6 , here
+                conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,6),strides = (1,6), padding = 'valid',use_bias=True,)(weekly_input)
+                fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+    
+                #adding pairs of 2 successive months history
+                conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+                # stack on top convolutional of 3 successive days after conv2
+                conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+                # addd conv, 2 successive pairs with stride = 1 on top
+                # or maybe add kernel 1,3 instead again
+                conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+                conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+                output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+                comb = tf.keras.layers.Concatenate()([fc_1,output1])
+    
+        elif(series_length == 8):
+                # weighting of groups of 4 years ! maybe use 8 years grouping instead
+                conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,4), padding = 'valid',use_bias=True,)(weekly_input)
+                fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+    
+                #adding pairs of 2 successive months history
+                conv2 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+                # stack on top convolutional of 3 successive days after conv2
+                conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv2)
+                # addd conv, 2 successive pairs with stride = 1 on top
+                # or maybe add kernel 1,3 instead again
+                conv4 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+                # maybe change the stride here 
+                conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,1),padding = 'valid' ,use_bias = True)(conv4)
+                output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv5))
+                comb = tf.keras.layers.Concatenate()([fc_1,output1])
+        else:
+                # 12 years
+                # weighting of groups of 4 years ! maybe use 8 years grouping instead
+                conv1 = ks.layers.Conv2D(filters = 32,kernel_size=(1,4),strides = (1,4), padding = 'valid',use_bias=True,)(weekly_input)
+                fc_1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv1))
+    
+                conv2 = ks.layers.Conv2D(filters = 32,kernel_size=(1,6),strides = (1,6), padding = 'valid',use_bias=True,)(weekly_input)
+                fc_2 = ks.layers.Dense(1)(ks.layers.Flatten()(conv2))
+    
+                #adding pairs of 2 successive months history
+                conv3 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(weekly_input)
+                # stack on top convolutional of 3 successive days after conv2
+                conv4 = ks.layers.Conv2D(filters = 32, kernel_size = (1,2),strides=(1,1),padding = 'valid' ,use_bias = True)(conv3)
+                # addd conv, 2 successive pairs with stride = 1 on top
+                # or maybe add kernel 1,3 instead again
+                conv5 = ks.layers.Conv2D(filters = 64, kernel_size = (1,4),strides=(1,2),padding = 'valid' ,use_bias = True)(conv4)
+                conv6 = ks.layers.Conv2D(filters = 64, kernel_size = (1,2),strides=(1,2),padding = 'valid' ,use_bias = True)(conv5)
+                output1 = ks.layers.Dense(1)(ks.layers.Flatten()(conv6))
+                comb = tf.keras.layers.Concatenate()([fc_1,fc_2,output1])
+    
+        # weighted combination of both the outputs
+        
+        output = tf.keras.layers.Dense(1, input_shape=(None, comb.shape[-1]))(comb)
+        
+        est = ks.Model(inputs=input, outputs=output)
+        est.compile(optimizer=ks.optimizers.Adam(lr=0.001), loss='mse', metrics=['mse'])
+        
+        epochs = epochs
+        batch_size =  bs
+        return est, epochs, batch_size
 
 
 
@@ -754,8 +769,8 @@ def build_Model():
     weekly = Model('weekly', 13, 1, weekly_model, [13,26,52], 52, True)
     # why 48 , 120 , 240 
     monthly = Model('monthly', 18, 12, monthly_model, [6, 8, 12,24,36], 12, False)
-    yearly = Model('yearly', 6, 1, yearly_model, [10, 20, 30], 1, False)
+    yearly = Model('yearly', 6, 1, yearly_model, [2, 3, 6, 8, 12,18,24], 1, False)
     quarterly = Model('quarterly', 8, 4, quarterly_model, [4, 8, 12], 4, False)
     
     # return [daily,monthly,quarterly,weekly,hourly,yearly]
-    return [quarterly]
+    return [yearly]
