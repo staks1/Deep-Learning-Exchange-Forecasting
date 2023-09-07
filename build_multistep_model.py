@@ -460,5 +460,5 @@ def build_m_Model():
     #yearly = Model('yearly', 3, 1, yearly_model, [18], 1, False)
     quarterly = Model('quarterly', 8, 4, quarterly_model, [4, 8, 12], 4, False)
     
-    # return [daily,monthly,quarterly,weekly,hourly,yearly]
-    return [yearly]
+    return [monthly,quarterly,weekly,yearly]
+    #return [daily]

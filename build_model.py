@@ -73,173 +73,9 @@ def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,b
     return est, epochs, batch_size
     
     
-'''
-def quarterly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
-    
-    
-    
-    input = ks.layers.Input((series_length,))
-    quarterly_input = ks.layers.Reshape((series_length, 1))(input)
-
-    # instead of taking the average of year let's take the average of each pair of 2 quarters
-    quarterly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(quarterly_input)
-
-
-    # naive prediction will be taken into account
-    # WE WILL TEST BY ADDING THE NAIVE PREDICTIONS AS WELL (IN A LESSER EXTENT)
-    # AND ALSO WITHOUT THE NAIVE
-    naive_1 = tf.roll(input, axis=0, shift=1)
-    # feed naive into a fcn
-    naive_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(naive_1))
-    naive_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(naive_hidden1)
-    naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
-    
-
-
-    quarterly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(quarterly_avg))
-    quarterly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(quarterly_hidden1)
-    quarterly_output = ks.layers.Dense(units=1, activation='linear')(quarterly_hidden2)
-
-
-    # ?? size = 4 ? or 2
-    quarterly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(quarterly_avg)
-
-
-    periodic_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(quarterly_avg_up)])
-
-    periodic_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(periodic_diff)
 
 
 
-
-
-    # change convolutional filters
-    periodic_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),
-                                     padding='valid')(periodic_input)
-
-    # change units
-    periodic_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(periodic_conv))
-    periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
-    periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
-
-    # TODO : TEST WITH AND WITHOUT THE NAIVE ADDED
-    
-    #output = ks.layers.Add()([quarterly_output, periodic_output,naive_output ])
-    
-    # i also combine the naive solution and feed all the outputs into an average aggregate 
-    output = tf.keras.layers.Average()([quarterly_output, periodic_output,naive_output ])
-
-
-    est = ks.Model(inputs=input, outputs=output)
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.001), loss='mse', metrics=['mse','accuracy'])
-    epochs = epochs
-    batch_size = bs
-    return est, epochs, batch_size
-'''
-
-
-# old model
-'''
-def weekly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
-
-    # if we make the assumption of full year (with february + 1 day)
-    if series_length == 52:
-        
-        
-        # Reshape into (X,1)
-        input = ks.layers.Input((series_length,1))
-
-    
-        # average of input for one year 
-        # maybe pool every 2 weeks and not from all the 52 weeks 
-        yearly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=1, padding='valid')(input)
-        # reshape into (1,1)
-        yearly_avg2 = ks.layers.Reshape((1,1))(yearly_avg)
-        
-        
-        
-        # usampling # 
-        yearly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(yearly_avg)
-        
-        
-        periodic_diff = ks.layers.Subtract()([input, yearly_avg_up])
-        
-        
-        periodic_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(periodic_diff)
-
-
-        periodic_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),padding='valid')(periodic_input)
-        
-        periodic_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(periodic_conv))
-        periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
-        periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
-
-
-        # pass the naive predictions through a fcn
-        naive_1 = tf.roll(input, axis=0, shift=1)
-        naive_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(naive_1))
-        naive_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(naive_hidden1)
-        naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
-        
-        # final output 
-        output = ks.layers.Add()([periodic_output, naive_output])
-        
-    
-        est = ks.Model(inputs=input, outputs=output)
-        est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
-        epochs = epochs
-        batch_size = bs
-
-
-    else:
-
-        #
-        input = ks.layers.Input((series_length,))
-        yearly_input = ks.layers.Reshape((series_length, 1))(input)
-
-        # calculate the naive solution
-        naive_1 = tf.roll(input, axis=0, shift=1)
-
-        # yearly average
-        yearly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(yearly_input)
-        yearly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(yearly_avg))
-        yearly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(yearly_hidden1)
-        yearly_output = ks.layers.Dense(units=1, activation='linear')(yearly_hidden2)
-
-
-        # usampling # 
-        yearly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(yearly_avg)
-
-
-        periodic_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(yearly_avg_up)])
-
-
-        periodic_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(periodic_diff)
-
-
-        periodic_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),
-                                         padding='valid')(periodic_input)
-        
-        periodic_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(periodic_conv))
-        periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
-        periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
-        
-        
-        
-        # pass the naive predictions through a fcn
-        naive_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(naive_1))
-        naive_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(naive_hidden1)
-        naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
-        
-        output = ks.layers.Add()([yearly_output, periodic_output])
-        #output = tf.keras.layers.Average()([yearly_output, periodic_output, naive_output ])
-        
-        est = ks.Model(inputs=input, outputs=output)
-        est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
-        epochs = 250
-        batch_size = 1000
-    return est, epochs, batch_size
-'''
 
 
 # new weekly model 
@@ -382,82 +218,6 @@ def weekly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
 
 
 
-# i start from daily model 
-'''  old model (sos)
-def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
-    
-    
-    
-    input = ks.layers.Input((series_length,))
-    weekly_input = ks.layers.Reshape((series_length,1))(input)
-    
-    
-    
-    
-    # naive model 
-    naive_1 = tf.roll(input, axis=0, shift=1)
-    # feed naive into a fcn
-    naive_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(naive_1))
-    naive_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(naive_hidden1)
-    naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
-    
-    
-    
-    
-    
-    # add simple regression parameters (single layer perceptron)
-    # maybe test higher powers 
-    y_linear_reg = ks.layers.Dense(units=1,activation = 'linear')(input)
-    
-    y_linear_reg = ks.layers.BatchNormalization()(y_linear_reg)
-    
-    # weekly avg # 
-    weekly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(weekly_input)
-    
-    
-    weekly_avg = ks.layers.BatchNormalization()(weekly_avg)
-    
-    #weekly_hidden1 = ks.layers.Dense(units=series_length, activation='relu')(ks.layers.Flatten()(weekly_avg))
-    weekly_hidden1 = ks.layers.Dense(units=series_length, activation='relu')(weekly_avg)
-    weekly_output = ks.layers.Dense(units=1, activation='linear')(weekly_hidden1)
-    # average upsampling 
-    weekly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(weekly_avg)
-    
-    
-
-    # subtract from the naive solution the average and not from the original series 
-    periodic_diff = ks.layers.Subtract()([weekly_input,weekly_avg_up])
-    
-    periodic_diff = ks.layers.BatchNormalization()(periodic_diff)
-    
-    
-    # tensor and convolution 
-    periodic_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(periodic_diff)
-    
-    # convolutional 
-    periodic_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),padding='valid')(periodic_input)
-    periodic_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(periodic_conv))
-    periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
-    periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
-    
-    #periodic_output = ks.layers.BatchNormalization()(periodic_output)
-    
-    
-    #output = ks.layers.Add()([weekly_output, periodic_output,naive_output])
-    #output = tf.keras.layers.Average()([weekly_output, periodic_output,y_linear_reg])
-    output = tf.keras.layers.Add()([weekly_output , naive_output])
-    
-    
-    est = ks.Model(inputs=input, outputs=output)
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse'])
-    
-    
-    
-    epochs = epochs
-    batch_size =  bs
-    return est, epochs, batch_size
-'''
-
 # new convolutional daily model 
 def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     
@@ -520,77 +280,7 @@ def daily_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
     return est, epochs, batch_size
 
 
-'''
-def monthly_model(series_length,yearly_count,filter_count,units_count,epochs,bs):
 
-
-    input = ks.layers.Input((series_length,))
-    yearly_input = ks.layers.Reshape((series_length, 1))(input)
-
-
-    # pool average of 1 year
-    # 12 months
-    yearly_avg = ks.layers.AveragePooling1D(pool_size=yearly_count, strides=yearly_count, padding='valid')(yearly_input)
-
-    # 50 units fcn
-    yearly_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(yearly_avg))
-    yearly_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(yearly_hidden1)
-
-    # output 1 unit fcn
-    yearly_output = ks.layers.Dense(units=1, activation='linear')(yearly_hidden2)
-
-
-
-
-    # from each month subtract the average of the corresponding year
-    yearly_avg_up = ks.layers.UpSampling1D(size=yearly_count)(yearly_avg)
-    # upsample and create the differences
-    periodic_diff = ks.layers.Subtract()([input, ks.layers.Flatten()(yearly_avg_up)])
-
-
-    # create tensor for cnn
-    periodic_input = ks.layers.Reshape((series_length // yearly_count, yearly_count, 1))(periodic_diff)
-
-
-    periodic_conv = ks.layers.Conv2D(filters=filter_count, kernel_size=(1, yearly_count), strides=(1, yearly_count),
-                                     padding='valid')(periodic_input)
-
-
-    periodic_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(periodic_conv))
-    periodic_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(periodic_hidden1)
-    periodic_output = ks.layers.Dense(units=1, activation='linear')(periodic_hidden2)
-
-
-    # we are going to use each k month
-    # and use the value for the k+1 month as an additional term to be added in the output
-    # (naive method term)
-    # substitute each (k+1) month with k month
-    # first shift each month value towards bigger index (each value moves one time step forward)
-    # THE LAST MONTH WILL GO CYCLICALLY AND REPLACE THE 1ST MONTH !!! THIS IS NOT A GOOD IDEA
-    # SINCE WE LOSE THE 1ST MONTH
-    # MAYBE WE SHOULD COPY THE 1ST MONTH VALUE (WHICH WAS SHIFTED TO THE 3ND VALUE)
-    # BACK TO THE 1ST VALUE AS WELL
-    naive= tf.roll(input,shift=1,axis=0)
-    # pass the naive predictions through a fcn
-    naive_hidden1 = ks.layers.Dense(units=units_count, activation='relu')(ks.layers.Flatten()(naive))
-    naive_hidden2 = ks.layers.Dense(units=units_count, activation='relu')(naive_hidden1)
-    naive_output = ks.layers.Dense(units=1, activation='linear')(naive_hidden2)
-
-    # output 1 unit fcn
-    #yearly_output = ks.layers.Dense(units=1, activation='linear')(yearly_hidden2)
-
-
-    # i also add the naive output in a lesser extent
-    #output = ks.layers.Add()([yearly_output, periodic_output,0.4 * naive_output])
-    output = tf.keras.layers.Average()([yearly_output, periodic_output,naive_output ])
-
-
-    est = ks.Model(inputs=input, outputs=output)
-    est.compile(optimizer=ks.optimizers.Adam(lr=0.01), loss='mse', metrics=['mse','accuracy'])
-    epochs = 250
-    batch_size = 1000
-    return est, epochs, batch_size
-'''
 
 
 
@@ -769,8 +459,9 @@ def build_Model():
     weekly = Model('weekly', 13, 1, weekly_model, [13,26,52], 52, True)
     # why 48 , 120 , 240 
     monthly = Model('monthly', 18, 12, monthly_model, [6, 8, 12,24,36], 12, False)
-    yearly = Model('yearly', 6, 1, yearly_model, [2, 3, 6, 8, 12,18,24], 1, False)
+    yearly = Model('yearly', 6, 1, yearly_model, [2, 3, 6, 8, 12,18], 1, False)
+    #yearly = Model('yearly', 3, 1, yearly_model, [18], 1, False)
     quarterly = Model('quarterly', 8, 4, quarterly_model, [4, 8, 12], 4, False)
     
-    # return [daily,monthly,quarterly,weekly,hourly,yearly]
-    return [yearly]
+    return [daily,monthly,quarterly,weekly,yearly]
+    #return [yearly]
