@@ -286,7 +286,16 @@ if __name__=="__main__" :
         
         
         #-------------- BEGIN TRAINING MULTI STEP----------------------------------------#
-        train_models_multi_step(frequencies)
+        #train_models_multi_step(frequencies)
+        #--------------------------------------------------------------------------------#
+        
+        
+        #-------------- BEGIN TRAINING MULTI STEP SLIDING WINDOW-------------------------#
+        #slide_train_multi_step(frequencies)
+        #--------------------------------------------------------------------------------#
+        
+        #-------------- BEGIN TRAINING SINGLE STEP SLIDING WINDOW-------------------------#
+        slide_train_single_step(frequencies)
         #--------------------------------------------------------------------------------#
         
                 
