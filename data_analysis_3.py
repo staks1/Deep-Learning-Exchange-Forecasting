@@ -279,6 +279,9 @@ if __name__=="__main__" :
             frequencies[freq_name] = (frequencies[freq_name],data)
             
         
+        
+        
+        
         #-------------- BEGIN TRAINING SINGLE STEP---------------------------------------#
         #train_models_single_step(frequencies)
         #--------------------------------------------------------------------------------#
@@ -295,15 +298,12 @@ if __name__=="__main__" :
         #--------------------------------------------------------------------------------#
         
         #-------------- BEGIN TRAINING SINGLE STEP SLIDING WINDOW-------------------------#
-        slide_train_single_step(frequencies)
+        #slide_train_single_step(frequencies)
         #--------------------------------------------------------------------------------#
         
-                
-                    
-                  
-               
-                    
-                    
-                    
-                    
-                   
+        
+        #-------------- BEGIN TRAINING MULTI STEP SLIDING WINDOW, ONE MODEL PER CURRENCY---#
+        slide_train_multi_step_one(frequencies)
+        #----------------------------------------------------------------------------------#
+        
+      
