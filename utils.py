@@ -903,10 +903,10 @@ def slide_train_multi_step_one(frequencies):
                                             # 2)x[2*(horizon+series_length)]--> validation set 
                                             # then move 2 periods ahead and take the next 2 sets 
                                             #print(series.shape[1])
-                                            for i in range(len(series)// (2 * (series_length + m.horizon))):
+                                            for g in range(len(series)// (2 * (series_length + m.horizon))):
                                                         
                                                         # print the i 
-                                                        print(f"\nTHE ITERATION NUMBER IS : {i}\n")
+                                                        print(f"\nTHE ITERATION NUMBER IS : {g}\n")
                                                         
                                                         
                                             
@@ -915,12 +915,14 @@ def slide_train_multi_step_one(frequencies):
                                                         window = series_length + m.horizon
                                                         
                                                         # set x,y train (training + horizon )        
-                                                        train_series = series.iloc[i * window : i * window + 2 * window]
+                                                        train_series = series.iloc[g * window : g * window + 2 * window]
                                                         
                                                         # stop training if we dont have enough time data to continue the sliding window 
-                                                        # just for safety 
-                                                        if(len(train_series) <  2 * window):
-                                                            break 
+                                                        
+                                                        #-------- SHOULD TEST WITHOUT THE BREAK JUST IN CASE -------#
+                                                        #if(len(train_series) <  2 * window):
+                                                        #    break 
+                                                        #-----------------------------------------------------------#
                                                         
                                                         
                                                         # pick current training set 
@@ -959,10 +961,10 @@ def slide_train_multi_step_one(frequencies):
                                             
                                             #TODO : SHOULD FIX BUG HERE 
                                             # IT CREATES ANOTHER DIRECTORY WITH CONCATENATED THE FREQUENCY AND 'MULTI_STEP'
-                                            if not os.path.exists(os.path.join('../trained_models', 'multi_step','sliding',currency,m.freq_name)):
-                                                    os.makedirs(os.path.join('../trained_models', 'multi_step','sliding', currency,m.freq_name))
+                                            if not os.path.exists(os.path.join('../trained_models', 'multi_step','sliding',currency,m.freq_name,str(series_length) )):
+                                                    os.makedirs(os.path.join('../trained_models', 'multi_step','sliding', currency,m.freq_name,str(series_length) ))
                                                     
-                                            model_file = os.path.join('../trained_models','multi_step','sliding',currency,m.freq_name,
+                                            model_file = os.path.join('../trained_models','multi_step','sliding',currency,m.freq_name,str(series_length),
                                                                           '{}_length_{}.h5'.format(m.freq_name, series_length))
                                             # save model 
                                             cur_model.save(model_file) 
