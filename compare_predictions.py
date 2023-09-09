@@ -24,14 +24,18 @@ import glob
 
 
 # function to plot all history  + prediction using subplots 
-def visualize(data,predicted_data,label):
+def visualize(data,predicted_data,label,save=False):
     
     
     # total plots 
     fig, axes = plt.subplots(nrows = 9, ncols=2, figsize=(25, 40))  # 3x4 grid for subplots
     #select currency from dataset 
-    
+    # just for testing 
+    # let's only compare the 3 first currencies 
+    # ---I COMMENT OUT THE RANGE TO TEST ONLY THE FIRST 3 NOW --- #  
     for cur in range(18):
+    #for cur in range(3):
+    
         row = (cur-1) // 2  # Determine row index
         col = (cur-1) % 2
         
@@ -96,7 +100,7 @@ def mapName(df,freq_name):
     
     
 # give 'weekly'/'daily' ... horizon_number to plot history vs predictions 
-def history_vs_prediction(label,horizon):
+def history_vs_prediction(label,horizon,save=None):
     #title = label + " Predictions" 
     horizon = horizon
     # path of the different models for this frequency 
@@ -117,4 +121,81 @@ def history_vs_prediction(label,horizon):
 
 # run as main 
 if __name__=="__main__":
-    history_vs_prediction('weekly',13)
+    # history_vs_prediction('weekly',13)
+    #history_vs_prediction('daily',14)
+    
+    
+    
+    # Let's now read all the different frequency - datasets 
+    # for each frequency we take the end of the month 
+    frequencies = {
+        'daily': 'D',
+        'weekly': 'W',
+        'monthly': 'M',
+        'quarterly': 'Q',
+        'yearly': 'Y'
+    }
+    
+    
+    # Create the output folder if it does not exist
+    # also make generator for later to read each dataset sequentially 
+    # add to dictionary the datasets 
+
+    for freq_name, freq_code in frequencies.items():
+        data = pd.read_csv(f"/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset/{freq_name}.csv",index_col='Date')
+        frequencies[freq_name] = (frequencies[freq_name],data)
+        
+        
+    # let's only test the 3 first currencies 
+    
+    data = frequencies['daily'][1].transpose()
+    
+    
+    
+    
+    # for daily series 
+    horizon = 14
+    
+    
+    # path of the different models for this frequency 
+    # here we will read all the series length models for each currency 
+    # let's pick ud first 
+    currency = 'USD'
+    freq_name = 'daily'
+    
+    # pick all the series_length models for this currency and this freq_name 
+    y_path = glob.glob(f"../predictions/multi_step/sliding/{currency}/{freq_name}/*/*.csv",recursive=True)
+    
+    
+    for p in y_path :
+        
+        # let's get the series_length from the glob path 
+        series_length = p.split("/")[-2]
+        
+        # read predictions 
+        #y_model_1 = pd.read_csv(p, header=0, index_col=0).loc[:,'F1':'F'+str(horizon)].transpose()
+        
+        y_model_1 = pd.read_csv(p, header=0, index_col=0).loc[:,:].transpose()
+        # i will pick for history a history of 3*horizons (can also be customized )
+        # or maybe i will plot (series_length + horizon of the history)
+        history = pd.read_csv(os.path.join('../dataset',f"{freq_name}.csv"), header=0,index_col=0).transpose().iloc[:,-(3*int(series_length)):]
+        #history = history.iloc[:,-3 * horizon:]
+        #visualize(history,y_model_1,freq_name)
+        
+        
+        # we will now pick only the currency we are interested in to plot 
+        history = history.loc[currency,:].transpose()
+        
+    
+        #-------------------------------------#
+        
+        fig = plt.figure()
+        plt.xticks(rotation = 60)
+        plt.plot(history,'o-',color ='green',label='original history')
+        plt.plot(y_model_1,'o-',color='purple',label = 'predictions')
+        plt.title(f"FORECASTING, CURRENCY : {currency} , FREQUENCY : {freq_name} , TRAINING LENGTH : {series_length}")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+    
+    
