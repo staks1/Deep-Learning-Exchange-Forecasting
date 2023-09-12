@@ -44,19 +44,19 @@ def daily_model(series_length,bs,horizon,epochs=1000, GN=11):
     conv1 = tf.keras.layers.Conv1D(filters = 128 ,kernel_size=2,strides = 1, padding = 'valid',activation ='relu')(input)
     
     # add dropout 
-    conv1 = tf.keras.layers.Dropout(0.2)(conv1)
+    conv1 = tf.keras.layers.Dropout(0.2)(conv1,training=True)
     
     conv2 = tf.keras.layers.Conv1D(filters = 128 ,kernel_size=2,strides = 1, padding = 'valid',activation = 'relu')(conv1)
     
     
     # add dropout 
-    conv2 = tf.keras.layers.Dropout(0.2)(conv2)
+    conv2 = tf.keras.layers.Dropout(0.2)(conv2,training=True)
     
     
     conv3 = tf.keras.layers.Conv1D(filters = 128 ,kernel_size=2,strides = 1, padding = 'valid',activation = 'relu')(conv2)
     
     #add dropout 
-    conv3 = tf.keras.layers.Dropout(0.2)(conv3)
+    conv3 = tf.keras.layers.Dropout(0.2)(conv3,training=True)
     
     # what stride to we apply ? none stride or 1 stride ? 
     # strides = None ??  or 1 ?
@@ -78,7 +78,7 @@ def daily_model(series_length,bs,horizon,epochs=1000, GN=11):
     for i in range(1,GN + 1):
         hl = hidden_layers[i](hidden_layers[i-1])
         # add dropout 
-        hl = tf.keras.layers.Dropout(0.2)(hl)
+        hl = tf.keras.layers.Dropout(0.2)(hl,training=True)
         # save output 
         hidden_layers[i] = hl
         
