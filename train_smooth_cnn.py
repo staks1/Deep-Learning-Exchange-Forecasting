@@ -70,7 +70,7 @@ class CustomDataGen(Sequence):
                 return (batch_x,batch_y)
             
             
-            elif(len(batch_x) ==300):
+            elif(len(batch_x) ==self.series_length):
                 #batch_x = batch_x
                 batch_x = np.array(batch_x).reshape((-1,self.series_length))
                 batch_y = self.labels[idx*self.batch_size * self.horizon : idx * self.batch_size*self.horizon + self.batch_size * self.horizon].reshape((-1,self.horizon))
@@ -138,125 +138,53 @@ def plot_scnn_Loss(history,horizon,series_length,freq_name,cur,s=False):
         #plt.show()
     
 
-def slide_train_multi_step(frequencies):
-    # call build model to create the models 
-    # probably we need new model scrip here
-    # which will have the multi step models only
-    
-    models = sCnn()
-    
-    
-    # add the other frequencies as well (i have only built with daily for now)
-    for m in models :
-                
-            # pick each frequency dataset (but after 2013-...)
-            # normalize and find optimum 'alpha' for exponential smoothing 
-            series = frequencies[m.freq_name][1].loc['2013-01-07':]
-            series_norm = MinMaxScaler().fit_transform(series)
-            series_norm = pd.DataFrame(series_norm, index=series.index , columns = series.columns) 
-            optimum_a = optimum_al(series_norm)
-            smoothed_series = exponential_smooth(series_norm, optimum_a)
-            
-                
-            for series_length in m.training_lengths:
-                
-               
-                ks.backend.clear_session()
-                tf.compat.v1.reset_default_graph()
-                np.random.seed(0)
-                session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-                tf.compat.v1.set_random_seed(0)
-                tf_session = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
-                tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=session_conf))
-                
-                
-                #for all currencies 
-                for cur in series.columns:
-                
-                    # call the model constructor
-                    mod=m.model_constructor
-                    #------------ I can also test the same model with all the other frequencies !
-                    if(m.freq_name=='daily'):
-                        cur_model,epochs,batch_size = mod(series_length,1,m.horizon)
-                    
-                   
-                    
-                    #------------- HOW DO WE SPLIT FOR TRAINING ?? IT IS NOT KNOWN FROM THE PAPER ----------#
-                    # WHAT HORIZON DO WE TRAIN FOR . IT IS ALSO NOT KNOWN FROM THE PAPER -------------------#
-                    # TODO : SHOULD TEST SLIDING WINDOW TRAINING OR DIFFERENT RANGES TO TRAIN 
-                    # I WILL PICK FOR NOW FROM THE LATEST YEAR 2022 : 2022-01-03 + history(364) days , 91 days for validation (20%)
-                    # 2022-01-03
-                    
-                    # Here we wil call the datagenerator #
-                    
-                    # for now just test using 364 for training 
-                    x_train = smoothed_series.iloc[-500:-136,:]
-                    y_train = smoothed_series.iloc[-136:-122,:]
-                    
-                    # pick current validation set 
-                    x_val = smoothed_series.iloc[-122:-31,:]
-                    y_val = smoothed_series.iloc[-31:-17,:]
-                    
-                    # pick only 1d series slice for each currency to train 
-                    # maybe also i should transpose it ! 
-                    x_train = x_train[cur].transpose()
-                    y_train = y_train[cur].transpose()
-                    x_val = x_val[cur].transpose()
-                    y_val = y_val[cur].transpose()
-                
-                    
-                    #-----------------------------------------------------------------------#
-                    # set batch size = 20 
-                    history = cur_model.fit(x_train, y_train, epochs=epochs, 
-                    validation_data = (x_val,y_val),
-                    callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=800)])
-                    
-                    
-                    # plot Loss for this horizon step 
-                    #plotLoss(history,horizon_step,series_length,m.freq_name)
-                    
-                    #plot_multi_step_Loss(history,m.horizon,series_length,m.freq_name)
-                                
-                    
-                    # plot the losses 
-                    '''
-                    plot_multi_step_Loss(history,m.horizon,series_length,m.freq_name,True)
-                    
-                    
-                    #########################
-                    #----save the model ----#
-                    #########################
-                    
-                    #TODO : SHOULD FIX BUG HERE 
-                    # IT CREATES ANOTHER DIRECTORY WITH CONCATENATED THE FREQUENCY AND 'MULTI_STEP'
-                    if not os.path.exists(os.path.join('../trained_models', 'multi_step','sliding',m.freq_name)):
-                            os.makedirs(os.path.join('../trained_models', 'multi_step','sliding', m.freq_name))
-                            
-                    model_file = os.path.join('../trained_models','multi_step','sliding',m.freq_name,
-                                                  '{}_length_{}.h5'.format(m.freq_name, series_length))
-                    # save model 
-                    cur_model.save(model_file) 
-                    '''
-                    
-              
-# CREATE THE TRAINING AND VALIDATION GENERATORS 
+
+def dataset_picker(smoothed_series,freq_name,frequencies,cur):
+    # pick after 2010 or whole dataset for yearly 
+    if(freq_name != 'yearly'):
+        dataset2 = smoothed_series.loc['2010-01-04':]
+    # re normalize and smooth the new yearly data 
+    else:   
+        dataset2 = frequencies[freq_name][1]
+        series_norm = MinMaxScaler().fit_transform(dataset2)
+        series_norm = pd.DataFrame(series_norm, index=dataset2.index , columns = dataset2.columns) 
+        optimum_a = optimum_al(series_norm)
+        dataset2 = exponential_smooth(series_norm, optimum_a)
+        
+    # initial dataset 
+    # customize each frequency
+    if(freq_name =="daily"):    
+        train_dataset = dataset2.iloc[:2802][cur]
+        val_dataset = dataset2.iloc[2802:][cur]
+    elif(freq_name =="weekly"):    
+         train_dataset = dataset2.iloc[:570][cur]
+         val_dataset = dataset2.iloc[570:][cur]
+    elif(freq_name =="monthly"):    
+         train_dataset = dataset2.iloc[:115][cur]
+         val_dataset = dataset2.iloc[115:][cur]
+    elif(freq_name =="quarterly"):    
+         train_dataset = dataset2.iloc[:35][cur]
+         val_dataset = dataset2.iloc[35:][cur]
+    # i split 50 % 50 (probably not good but we dont have enough data)
+    # should try yearly with random splittingas well 
+    # TODO :TRAIN YEARLY WITH AUGMENTATION OR RANDOM SPLITTING SINCE WE DON'T HAVE ENOUGH DATA FOR HISTORY AND PREDICTIONS AND VALIDATION DATA 
+    elif(freq_name =="yearly"):    
+         train_dataset = dataset2.iloc[:13][cur]
+         val_dataset = dataset2.iloc[13:][cur]
+
+    return (train_dataset,val_dataset)
 
 
-           
-################### ONLY AS MAIN ###################             
-if __name__ =="__main__":
-    
-    frequencies = {
-        'daily': 'D',
-        'weekly': 'W',
-        'monthly': 'M',
-        'quarterly': 'Q',
-        'yearly': 'Y'
-    }
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+def train_smooth_cnn(frequencies):
     # Create the output folder if it does not exist
     # also make generator for later to read each dataset sequentially 
     # add to dictionary the datasets 
@@ -273,11 +201,14 @@ if __name__ =="__main__":
     # add the other frequencies as well (i have only built with daily for now)
     for m in models :
                 
-            # pick each frequency dataset (but after 2013-...)
+            # pick each frequency dataset (but after 2010-...)
             # normalize and find optimum 'alpha' for exponential smoothing 
-            series = frequencies[m.freq_name][1].loc['2013-01-07':]
+            #series = frequencies[m.freq_name][1].loc['2013-01-07':]
+            series = frequencies[m.freq_name][1].loc['2010-01-04':]
+            # normalize
             series_norm = MinMaxScaler().fit_transform(series)
             series_norm = pd.DataFrame(series_norm, index=series.index , columns = series.columns) 
+            # exponential smoothing
             optimum_a = optimum_al(series_norm)
             smoothed_series = exponential_smooth(series_norm, optimum_a)
             
@@ -296,16 +227,25 @@ if __name__ =="__main__":
                 
                 #for all currencies 
                 for cur in series.columns:
+                    epochs = 5000
                 
                     # call the model constructor
                     mod=m.model_constructor
                     #------------ I can also test the same model with all the other frequencies !
                     if(m.freq_name=='daily'):
-                        cur_model,epochs,batch_size = mod(series_length,2,m.horizon)
+                        cur_model,epochs,batch_size = mod(series_length,2,m.horizon,epochs=epochs)
+                    elif(m.freq_name == 'weekly'):
+                        cur_model,epochs,batch_size = mod(series_length,2,m.horizon,epochs=epochs)
+                    elif(m.freq_name == 'monthly'):
+                        cur_model,epochs,batch_size = mod(series_length,2,m.horizon,epochs=epochs)
+                    elif(m.freq_name == 'quarterly'):
+                        cur_model,epochs,batch_size = mod(series_length,2,m.horizon,epochs=epochs)
+                    else :
+                        cur_model,epochs,batch_size = mod(series_length,1,m.horizon)   
                     
-                    # create the 2 datasets
-                    train_dataset = smoothed_series.iloc[:2180][cur]
-                    val_dataset = smoothed_series.iloc[2180:][cur]
+                    
+                    # pick dataset depending on frequency 
+                    train_dataset,val_dataset = dataset_picker(smoothed_series,m.freq_name,frequencies,cur)
                     
                     # create the new generators 
                     # choose batch size here 
@@ -349,4 +289,26 @@ if __name__ =="__main__":
                                                   '{}_length_{}.h5'.format(m.freq_name, series_length))
                     # save model 
                     cur_model.save(model_file)
+
+################### ONLY AS MAIN ###################             
+if __name__ =="__main__":
+    
+    frequencies = {
+        'daily': 'D',
+        'weekly': 'W',
+        'monthly': 'M',
+        'quarterly': 'Q',
+        'yearly': 'Y'
+    }
+    
+    # train the smooth cnn 
+    # 1) exponential smooth
+    # 2) training 
+    train_smooth_cnn(frequencies)
+    
+    
+    
+    # predict 
+    
+    
                     
