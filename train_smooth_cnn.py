@@ -182,8 +182,6 @@ def dataset_picker(smoothed_series,freq_name,frequencies,cur):
 
 
 
-
-
 def train_smooth_cnn(frequencies):
     # Create the output folder if it does not exist
     # also make generator for later to read each dataset sequentially 
@@ -205,12 +203,16 @@ def train_smooth_cnn(frequencies):
             # normalize and find optimum 'alpha' for exponential smoothing 
             #series = frequencies[m.freq_name][1].loc['2013-01-07':]
             series = frequencies[m.freq_name][1].loc['2010-01-04':]
+            f_s = frequencyCalc(m.freq_name)
+            series.index = pd.DatetimeIndex(series.index).to_period(f_s)
+            
+            
             # normalize
             series_norm = MinMaxScaler().fit_transform(series)
             series_norm = pd.DataFrame(series_norm, index=series.index , columns = series.columns) 
             # exponential smoothing
             optimum_a = optimum_al(series_norm)
-            smoothed_series = exponential_smooth(series_norm, optimum_a)
+            _,smoothed_series = exponential_smooth(series_norm, optimum_a)
             
                 
             for series_length in m.training_lengths:

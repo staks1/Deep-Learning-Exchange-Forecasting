@@ -49,7 +49,10 @@ def predict_smooth_cnn(frequencies):
             for m in models:
                 # MinMaxScaler().inverse_transform(X)
                 
+                
+                # SHOULDI DO THE EXPONENTIAL SMOOTHING AND THE NORMALIZATION ONLY ON THE SUBPARTS I WANT TO TRAIN OR NOT ??
                 series = frequencies[m.freq_name][1].loc['2010-01-04':]
+                
                 series_norm = MinMaxScaler().fit_transform(series)
                 series_norm = pd.DataFrame(series_norm, index=series.index , columns = series.columns) 
                 optimum_a = optimum_al(series_norm)
@@ -63,6 +66,9 @@ def predict_smooth_cnn(frequencies):
                 # for all training lengths
                 for series_length in m.training_lengths:
 
+
+                    # let's normalize all the currencies and apply the exponential smoothing
+                    
 
                      # pick the history we need to use to predict the next horizon
                      # maybe it needs reshaping into (1,series_length) ??

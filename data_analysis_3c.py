@@ -34,7 +34,8 @@ from sklearn.model_selection import GroupShuffleSplit
 from scikeras.wrappers import KerasClassifier, KerasRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
-from statsmodels.tsa.api import ExponentialSmoothing, SimpleExpSmoothing, Holt
+from statsmodels.tsa.api import SimpleExpSmoothing, Holt
+from statsmodels.tsa.holtwinters import ExponentialSmoothing , HoltWintersResults
 
 
 
@@ -264,28 +265,58 @@ def save_image(fig,currency,year):
 # function to implement the optimum "a" for exponential smoothing 
 # as described in the paper 
 def optimum_al(series):
-    opt_a =(series.max() - series.min() - series.mean() )/(series.max() - series.min())
+    opt_a =(series.max() - series.min() - series.mean() ) / (series.max() - series.min())
     return opt_a
 
 
 
 
 # for all currencies apply exponential smoothing using each currency's optimum alpha 
-# TODO : SHOULD PROBABLY IMPLEMENT MY SIMPLE EXPONENTIAL SMOOTHING SINCE STATSMODELS ES DOES NOT SEEM TO
 # ONLY CALCULATE THE FORMULA 
 # FOR NOW I USE THE ES FROM STATSMODELS AND ONLY CUSTOMIZE THE OPTIMUM a 
-def exponential_smooth(series,optimum_a):
+# I ALSO GIVE THE OPTION FOR HOLT WINTER'S EXPONENTIAL SMOOTHING 
+# TODO : FOR HOLT WINTER'S SHOULD SET : seasonal_periods=None,freq=None , for each series 
+def exponential_smooth(series,optimum_a,Hw=False):
     
     temp = np.zeros((series.shape[0],series.shape[1]))
     
     for i,c in enumerate(series.columns):
-        sm = SimpleExpSmoothing(series[c], initialization_method="heuristic").fit(
-                        smoothing_level=optimum_a[c], optimized=False)
-        temp[:,i] = sm.fittedvalues
-    # transform to dataframe again and return it 
-    smoothed_series = pd.DataFrame(temp,index=series.index , columns = series.columns)
-    return smoothed_series    
         
+          
+           if(Hw==False):     
+                #--------------------------- simple smoothing --------------------------- #
+                sm = SimpleExpSmoothing(series[c], initialization_method="estimated").fit(
+                              smoothing_level=optimum_a[c], optimized=False)
+                #-------------------------------------------------------------------------#
+                temp[:,i] = sm.fittedvalues
+                mod = sm
+           else :
+                hw = ExponentialSmoothing(
+                    series[c], trend="add", seasonal="add"
+                    , initialization_method='estimated' 
+                    ).fit(optimized=True)
+                 
+                temp[:,i] = hw.fittedvalues
+                mod = hw
+            # transform to dataframe again and return it 
+    smoothed_series = pd.DataFrame(temp,index=series.index , columns = series.columns)
+    return mod,smoothed_series
+ 
+
+# frequency calculator 
+# NOT SURE ABOUT THOSE FREQUENCIES 
+def frequencyCalc(freq_name):
+    if(freq_name == "daily"):
+        return 'B'
+    elif(freq_name == "weekly"):
+        return 'W'
+    elif(freq_name == "monthly"):
+        return 'BM'
+    elif(freq_name == 'quarterly'):
+        return 'BQ'
+    else :
+        return 'BA'
+
 
 
 # only called as main for testing 
@@ -325,8 +356,12 @@ if __name__=="__main__" :
         #-------------let's do it for the daily series------------------------------------#
         # 0) first we only keep the data from 2013 onwards (2013-2023)
         daily = frequencies['daily'][1].loc['2013-01-07':]
+        daily.index = pd.DatetimeIndex(daily.index).to_period('B')
+        #print(daily.index.dtype)
         
-        
+        #daily = pd.DataFrame(daily(index=daily.index)
+                             
+                             
         # 1) first max min normalize the data and reconstruct the new normalized dataframe 
         daily_norm = MinMaxScaler().fit_transform(daily)
         daily_norm = pd.DataFrame(daily_norm, index=daily.index , columns = daily.columns)
@@ -339,8 +374,10 @@ if __name__=="__main__" :
         
         
         # 2b) apply exponential smoothing on all the currency series 
-        smoothed_series = exponential_smooth(daily_norm, optimum_a)
+        _,smoothed_series_simple = exponential_smooth(daily_norm, optimum_a)
+        _,smoothed_series_hw = exponential_smooth(daily_norm, optimum_a,True)
         
         
         #3) Now that we have smoothed out series we can feed the series to a convolutional model
         # to try to predict the horizons in the future 
+        
