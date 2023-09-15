@@ -163,7 +163,7 @@ def dataset_picker(smoothed_series,freq_name,frequencies,cur):
         series_norm = MinMaxScaler().fit_transform(dataset2)
         series_norm = pd.DataFrame(series_norm, index=dataset2.index , columns = dataset2.columns) 
         optimum_a = optimum_al(series_norm)
-        _,dataset2 = exponential_smooth(series_norm, optimum_a)
+        _,dataset2 = exponential_smooth(series_norm, optimum_a,freq_name,Hw=True)
         
     # initial dataset 
     # customize each frequency
@@ -234,7 +234,7 @@ def train_smooth_cnn(frequencies):
             optimum_a = optimum_al(series_norm)
             
             # using SIMPLE EXPONENTIAL SMOOTHING or HOLT WINTERS
-            _,smoothed_series = exponential_smooth(series_norm, optimum_a,Hw=False)
+            _,smoothed_series = exponential_smooth(series_norm, optimum_a,m.freq_name,Hw=True)
             
                 
             for series_length in m.training_lengths:

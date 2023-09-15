@@ -75,7 +75,7 @@ def predict_smooth_cnn(frequencies):
                 # find the optimum alpha for this currency and apply the exponential smoothing 
                 
                 optimum_a = optimum_al(series_norm)
-                _,smoothed_series = exponential_smooth(series_norm, optimum_a)
+                _,smoothed_series = exponential_smooth(series_norm,optimum_a,m.freq_name,Hw=True)
                 
                 
                 

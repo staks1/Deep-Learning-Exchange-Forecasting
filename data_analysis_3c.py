@@ -268,7 +268,18 @@ def optimum_al(series):
     opt_a =(series.max() - series.min() - series.mean() ) / (series.max() - series.min())
     return opt_a
 
-
+# function to pick the seasonal periods based on the frequency dataset selected 
+def seasonals(freq_name):
+    if(freq_name == "daily"):
+        return 5
+    elif(freq_name == "weekly"):
+        return 3
+    elif(freq_name == "monthly"):
+        return 12
+    elif(freq_name == 'quarterly'):
+        return 4
+    else :
+        return 4
 
 
 # for all currencies apply exponential smoothing using each currency's optimum alpha 
@@ -276,7 +287,7 @@ def optimum_al(series):
 # FOR NOW I USE THE ES FROM STATSMODELS AND ONLY CUSTOMIZE THE OPTIMUM a 
 # I ALSO GIVE THE OPTION FOR HOLT WINTER'S EXPONENTIAL SMOOTHING 
 # TODO : FOR HOLT WINTER'S SHOULD SET : seasonal_periods=None,freq=None , for each series 
-def exponential_smooth(series,optimum_a,Hw=False):
+def exponential_smooth(series,optimum_a,freq_name,Hw=False):
     
     temp = np.zeros((series.shape[0],series.shape[1]))
     
@@ -293,7 +304,8 @@ def exponential_smooth(series,optimum_a,Hw=False):
            else :
                 hw = ExponentialSmoothing(
                     series[c], trend="add", seasonal="add"
-                    , initialization_method='estimated' 
+                    , initialization_method='estimated',
+                      seasonal_periods = seasonals(freq_name)
                     ).fit(optimized=True)
                  
                 temp[:,i] = hw.fittedvalues
