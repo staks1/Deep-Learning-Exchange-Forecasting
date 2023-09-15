@@ -146,10 +146,24 @@ def dataset_picker(smoothed_series,freq_name,frequencies,cur):
     # re normalize and smooth the new yearly data 
     else:   
         dataset2 = frequencies[freq_name][1]
+        
+        
+        # TRY TO FIX THE CORRECT FREQUENCY -----------------------#
+        #-----------probably correct should check again-----------#
+        f_s = frequencyCalc(freq_name)
+        
+        # change index to datetime 
+        dataset2.index = pd.DatetimeIndex(dataset2.index)
+        
+        # I applied the dataframe to period  and not the index to period 
+        #TODO : BUSINESS MONTH END NOT WORKING , I USED NORMAL MONTH END (SHOULD CHECK !)
+        dataset2 = dataset2.to_period(f_s)
+        
+        #---------------------------------------------------------#
         series_norm = MinMaxScaler().fit_transform(dataset2)
         series_norm = pd.DataFrame(series_norm, index=dataset2.index , columns = dataset2.columns) 
         optimum_a = optimum_al(series_norm)
-        dataset2 = exponential_smooth(series_norm, optimum_a)
+        _,dataset2 = exponential_smooth(series_norm, optimum_a)
         
     # initial dataset 
     # customize each frequency
@@ -204,7 +218,13 @@ def train_smooth_cnn(frequencies):
             #series = frequencies[m.freq_name][1].loc['2013-01-07':]
             series = frequencies[m.freq_name][1].loc['2010-01-04':]
             f_s = frequencyCalc(m.freq_name)
-            series.index = pd.DatetimeIndex(series.index).to_period(f_s)
+            
+            # change index to datetime 
+            series.index = pd.DatetimeIndex(series.index)
+            
+            # I applied the dataframe to period  and not the index to period 
+            #TODO : BUSINESS MONTH END NOT WORKING , I USED NORMAL MONTH END (SHOULD CHECK !)
+            series = series.to_period(f_s)
             
             
             # normalize
@@ -212,7 +232,9 @@ def train_smooth_cnn(frequencies):
             series_norm = pd.DataFrame(series_norm, index=series.index , columns = series.columns) 
             # exponential smoothing
             optimum_a = optimum_al(series_norm)
-            _,smoothed_series = exponential_smooth(series_norm, optimum_a)
+            
+            # using SIMPLE EXPONENTIAL SMOOTHING or HOLT WINTERS
+            _,smoothed_series = exponential_smooth(series_norm, optimum_a,Hw=False)
             
                 
             for series_length in m.training_lengths:
@@ -229,7 +251,7 @@ def train_smooth_cnn(frequencies):
                 
                 #for all currencies 
                 for cur in series.columns:
-                    epochs = 5000
+                    epochs = 200
                 
                     # call the model constructor
                     mod=m.model_constructor
@@ -271,7 +293,7 @@ def train_smooth_cnn(frequencies):
                 
                     history = cur_model.fit( x_train,y_train,epochs=epochs,
                                             validation_data = next(val_gen),
-                                            callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=800)])
+                                            callbacks=[ ks.callbacks.EarlyStopping(monitor='val_loss', patience=50)])
                     
                     # PLOT LOSS FOR THIS MODEL
                     plot_scnn_Loss(history,m.horizon,series_length,m.freq_name,cur,True)

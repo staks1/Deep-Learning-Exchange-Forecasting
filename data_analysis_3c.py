@@ -311,17 +311,72 @@ def frequencyCalc(freq_name):
     elif(freq_name == "weekly"):
         return 'W'
     elif(freq_name == "monthly"):
-        return 'BM'
+        # BM SHOULD BE WORKING BUT IT DOES NOT SO I USED SIMPLE M : MONTH END , SHOULD CHECK 
+        #return 'BM'
+        return 'M'
     elif(freq_name == 'quarterly'):
-        return 'BQ'
+        #return 'BQ'
+        return 'Q'
     else :
-        return 'BA'
+        #return 'BA'
+        return 'A'
+
+
+def dataset_picker2(smoothed_series,freq_name,frequencies,cur):
+    # pick after 2010 or whole dataset for yearly 
+    if(freq_name != 'yearly'):
+        dataset2 = smoothed_series.loc['2010-01-04':]
+    # re normalize and smooth the new yearly data 
+    else:   
+        dataset2 = frequencies[freq_name][1]
+        
+        
+        # TRY TO FIX THE CORRECT FREQUENCY -----------------------#
+        #-----------probably correct should check again-----------#
+        f_s = frequencyCalc(freq_name)
+        
+        # change index to datetime 
+        dataset2.index = pd.DatetimeIndex(dataset2.index)
+        
+        # I applied the dataframe to period  and not the index to period 
+        #TODO : BUSINESS MONTH END NOT WORKING , I USED NORMAL MONTH END (SHOULD CHECK !)
+        dataset2 = dataset2.to_period(f_s)
+        
+        #---------------------------------------------------------#
+        series_norm = MinMaxScaler().fit_transform(dataset2)
+        series_norm = pd.DataFrame(series_norm, index=dataset2.index , columns = dataset2.columns) 
+        optimum_a = optimum_al(series_norm)
+        _,dataset2 = exponential_smooth(series_norm, optimum_a)
+        
+    # initial dataset 
+    # customize each frequency
+    if(freq_name =="daily"):    
+        train_dataset = dataset2.iloc[:2802][cur]
+        val_dataset = dataset2.iloc[2802:][cur]
+    elif(freq_name =="weekly"):    
+         train_dataset = dataset2.iloc[:570][cur]
+         val_dataset = dataset2.iloc[570:][cur]
+    elif(freq_name =="monthly"):    
+         train_dataset = dataset2.iloc[:115][cur]
+         val_dataset = dataset2.iloc[115:][cur]
+    elif(freq_name =="quarterly"):    
+         train_dataset = dataset2.iloc[:35][cur]
+         val_dataset = dataset2.iloc[35:][cur]
+    # i split 50 % 50 (probably not good but we dont have enough data)
+    # should try yearly with random splittingas well 
+    # TODO :TRAIN YEARLY WITH AUGMENTATION OR RANDOM SPLITTING SINCE WE DON'T HAVE ENOUGH DATA FOR HISTORY AND PREDICTIONS AND VALIDATION DATA 
+    elif(freq_name =="yearly"):    
+         train_dataset = dataset2.iloc[:14][cur]
+         val_dataset = dataset2.iloc[14:][cur]
+
+    return (train_dataset,val_dataset)
 
 
 
 # only called as main for testing 
 if __name__=="__main__" :
-       
+    
+        pass
     
         # Let's now read all the different frequency - datasets 
         # for each frequency we take the end of the month 
@@ -380,4 +435,15 @@ if __name__=="__main__" :
         
         #3) Now that we have smoothed out series we can feed the series to a convolutional model
         # to try to predict the horizons in the future 
+        t,v = dataset_picker2(frequencies['yearly'][1], 'yearly', frequencies, 'USD')
+        k = smoothed_series_simple.iloc[2802:]['USD']
         
+        
+        
+        
+        #dataset2 = frequencies['daily'][1].loc['2010-01-04':]
+        #data1a = dataset2.iloc[:2802]['USD']
+        
+        
+        
+        #dataset2 =frequencies['daily'][1].loc['2010-01-04':]

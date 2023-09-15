@@ -30,7 +30,7 @@ import tensorflow as tf
 # TODO : 4) learning rate is also not known from paper . I used 0.01 should also test other values 
 # TODO : 5) epoch number from paper it too damn large .I reduced it .I should also test with large values 
 
-def daily_model(series_length,bs,horizon,epochs=1000, GN=11):
+def scnn_model(series_length,bs,horizon,epochs=1000, GN=11):
     
     input = ks.layers.Input((series_length,1))
     #weekly_input = ks.layers.Reshape((-1,series_length,1))(input)
@@ -103,12 +103,18 @@ def daily_model(series_length,bs,horizon,epochs=1000, GN=11):
 def sCnn():
     Model = namedtuple('Model', ['freq_name', 'horizon', 'freq', 'model_constructor', 'training_lengths',
                                  'cycle_length', 'augment'])
-    #[7,14,21,28,56,84,256,364]
-    daily = Model('daily', 14, 1, daily_model, [364], 7, True)
+    
+    daily = Model('daily', 14, 1, scnn_model, [14,20,240], 7, True)
+    weekly = Model('weekly', 13, 1, scnn_model, [52,13,26], 52, True)
+    
+    monthly = Model('monthly', 18, 12, scnn_model, [24,18], 12, False)
+    quarterly = Model('quarterly', 8, 4, scnn_model, [12,8], 4, False)
+    yearly = Model('yearly', 6, 1, scnn_model, [6], 1, False)
     
     
-    return [daily]
-
+    #return [monthly,daily,weekly,quarterly,yearly]
+    return [quarterly,yearly,monthly,weekly,daily]
+    
 ######################### ONLY AS MAIN ################################################################
 
 if __name__ == "__main__":

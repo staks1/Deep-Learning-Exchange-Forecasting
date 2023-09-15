@@ -62,11 +62,12 @@ def mapName(df,freq_name):
 
     
 # give 'weekly'/'daily' ... horizon_number to plot history vs predictions 
-def history_vs_prediction():
+def history_vs_prediction(curs):
    
 
+
 # add the list of currencies that we want to plot here 
- for cur in ['USD','JPY']:
+ for cur in curs:
     
     y_path = glob.glob(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/predictions/scnn/multi_step/slide', cur ,"**/*.csv"),recursive=True)
    
@@ -84,18 +85,19 @@ def history_vs_prediction():
         # i will pick for history a history of 3*horizons (can also be customized )
         # DOES IT NEED TO BE TRANSPOSED ? 
         history = pd.read_csv(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/dataset',f"{freq}.csv"), 
-                              header=0,index_col=0).loc[:,cur][-30:].transpose()
+                              header=0,index_col=0).loc[:,cur][-1000:].transpose()
     
         fig = plt.figure()
         plt.plot(history,'o-',color ='green',label='original history')
         plt.plot(y_model_1,'o-',color='purple',label = 'predictions')
         plt.title(f'FORECASTING with currency : {cur} , frequency : {freq}, training_length : {series_length}' )
+        plt.xticks(rotation=90)
         plt.legend()
         
         # save images 
-        if not (os.path.exists('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations')):
-                os.makedirs('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations')
-        plt.savefig(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations', 
+        if not (os.path.exists('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide')):
+                os.makedirs('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide')
+        plt.savefig(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide', 
                                  cur +'_' + freq + '_' + str(series_length) + '.png'))
         plt.close()
         
@@ -127,6 +129,6 @@ if __name__=="__main__":
         
         
     # plot the predictions against the history 
-    history_vs_prediction()
+    history_vs_prediction(frequencies[freq_name][1].columns)
     
     

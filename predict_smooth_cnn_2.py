@@ -52,6 +52,13 @@ def predict_smooth_cnn(frequencies):
                 
                 # SHOULDI DO THE EXPONENTIAL SMOOTHING AND THE NORMALIZATION ONLY ON THE SUBPARTS I WANT TO TRAIN OR NOT ??
                 series = pd.DataFrame(frequencies[m.freq_name][1].loc['2010-01-04':][cur])
+                
+                # pick index frequency , business frequency 
+                f_s = frequencyCalc(m.freq_name)
+                series.index = pd.DatetimeIndex(series.index)
+                series = series.to_period(f_s)
+                
+                
                 series_n = np.reshape(series,(-1,1))
                 
                 
@@ -68,7 +75,7 @@ def predict_smooth_cnn(frequencies):
                 # find the optimum alpha for this currency and apply the exponential smoothing 
                 
                 optimum_a = optimum_al(series_norm)
-                smoothed_series = exponential_smooth(series_norm, optimum_a)
+                _,smoothed_series = exponential_smooth(series_norm, optimum_a)
                 
                 
                 
@@ -118,6 +125,7 @@ def predict_smooth_cnn(frequencies):
                      prediction_df  =  pd.DataFrame(curr_prediction.copy())
                      prediction_denorm = np.array(prediction_df)
                      prediction_denorm = np.reshape(prediction_denorm,(-1,1))
+                     # denormalize 
                      prediction_denorm = minmax.inverse_transform(prediction_denorm)
                      final_prediction = np.reshape(prediction_denorm,(1,-1))
                      prediction[cur][m.freq_name][series_length]= final_prediction
