@@ -112,9 +112,9 @@ def visualize_past_horizon(frequencies):
     # from 2009 but i plot from 2010 just for observation 
     dseries = pd.DataFrame(frequencies['daily'][1].loc['2009-12-31':])
     wseries = pd.DataFrame(frequencies['weekly'][1].loc['2009-12-27':])
-    mseries = pd.DataFrame(frequencies['monthly'][1].loc[:'2009-12-31':])
-    qseries = pd.DataFrame(frequencies['quarterly'][1].loc[:'2009-12-31':])
-    yseries = pd.DataFrame(frequencies['yearly'][1].loc[:'2009-12-31':])
+    mseries = pd.DataFrame(frequencies['monthly'][1].loc['2009-12-31':])
+    qseries = pd.DataFrame(frequencies['quarterly'][1].loc['2009-12-31':])
+    yseries = pd.DataFrame(frequencies['yearly'][1].loc['2009-12-31':])
     #------------------------------------------------------------------#
  
     # Begin by selecting 20% of the datasets for each different frequency 
