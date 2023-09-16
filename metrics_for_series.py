@@ -218,8 +218,92 @@ def predict_on_history(frequencies):
                      output.to_csv(os.path.join('../predictions','scnn/multi_step/slide',cur,m.freq_name,str(series_length) , 'prediction.csv'))
 
 
+# function to evaluate the predictions 
+# against the true values (for past data , where the values are available)
+def evaluate(frequencies):
+    
+    # create dataframe for results
+    metrics = np.zeros((1,3))
+    
+    #metrics["smape"]=2
+    
+    #------------------ DATA FOR EVALUATION -------------------------#
+    # from 2009 but i plot from 2010 just for observation 
+    dseries = pd.DataFrame(frequencies['daily'][1].loc['2009-12-31':])
+    wseries = pd.DataFrame(frequencies['weekly'][1].loc['2009-12-27':])
+    mseries = pd.DataFrame(frequencies['monthly'][1].loc['2009-12-31':])
+    qseries = pd.DataFrame(frequencies['quarterly'][1].loc['2009-12-31':])
+    yseries = pd.DataFrame(frequencies['yearly'][1].loc['2009-12-31':])
+    #------------------------------------------------------------------#
+ 
+    # Begin by selecting 20% of the datasets for each different frequency 
+    # create a dictionary to retrieve each series for prediction , it also has the the horizon so we know how many values to plot/visualize
+    # in general we plot the actual values vs predicted horizon values 
+    
+    pred_dict = {'daily' : (dseries, 14),
+                 'weekly' : (wseries,13),
+                 'monthly' : (mseries,18),
+                 'quarterly' : (qseries,8),
+                 'yearly' : (yseries,6) }
+    
+    
+    
+    # define the currencies
+    series = frequencies['daily'][1]
+    curs = series.columns
+    
 
-
+    for cur in curs:
+       
+       y_path = glob.glob(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/predictions/scnn/multi_step/slide', cur ,"**/*.csv"),recursive=True)
+      
+       
+       
+       for p in y_path :
+           #get the frequenxy so i know which dataset to plot with 
+           freq = p.split('/')[-3]
+           series_length = p.split('/')[-2]
+           
+         
+           # i will pick for history a history of 3*horizons (can also be customized )
+           # DOES IT NEED TO BE TRANSPOSED ? 
+           horizon = pred_dict[freq][1]
+           history = pred_dict[freq][0][cur][: horizon ].transpose()
+           #selected_index = history[:horizon].index 
+           
+           
+           # read model predictions and set the predictions index same as the data index to align the true values with the predictions 
+           y_model_1 = pd.read_csv(p, header=0, index_col=0).iloc[:,: horizon].transpose()
+           #y_model_1.index = selected_index
+           
+           
+           # transform into arrays to calculate the metrics 
+           y_model_1 = np.array(y_model_1)
+           history = np.array(history)
+           
+           # calculate the metrics and save them into a csv file for each training_length for each frequency for each currency
+           mase_result = mase(history,y_model_1)
+           smape_result = smape(history,y_model_1)
+           
+           # ------- NOT SURE IF I AM GOING TO USE IT IN THE END ------------------------------#
+           # also calculate seasonal smape using the calculated seasonalities for each frequency 
+           seasonality = seasonals(freq)
+           seasonal_smape_result = mase_seasonal(history, y_model_1, seasonality)
+           
+           
+           # create dataframe of results 
+           metrics = pd.DataFrame ( {"mase":mase_result,"smape":smape_result,
+                                     "seasonal_smape":seasonal_smape_result},index = [0])
+           
+           
+           # save csv of metric to cur-> frequency -> series_length directory 
+           if not (os.path.exists(os.path.join('../evaluation','scnn/multi_step/slide',cur,freq,str(series_length )))):
+             os.makedirs(os.path.join('../evaluation','scnn/multi_step/slide',cur,freq,str(series_length) ))
+           metrics.to_csv(os.path.join('../evaluation','scnn/multi_step/slide',cur,freq,str(series_length) , 'evaluation.csv'))
+           
+           
+       
+      
 
 
 
@@ -275,4 +359,10 @@ if __name__=="__main__":
     mase_result2 = mase_seasonal(history, predictions, 5)
     '''
     
-    predict_on_history(frequencies)
+    
+    #----- use this to predict on past data so we can compare with the true data (for available true history) ---#
+    #predict_on_history(frequencies)
+    #------------------------------------------------------------------------------------------------------------#
+    evaluate(frequencies)
+    
+    
