@@ -62,7 +62,8 @@ def mapName(df,freq_name):
 
     
 # give 'weekly'/'daily' ... horizon_number to plot history vs predictions 
-def history_vs_prediction(curs):
+# for future data 
+def visualize_future_horizon(curs):
    
 
 
@@ -102,7 +103,75 @@ def history_vs_prediction(curs):
         plt.close()
         
         
-        
+# for already existent data (plot predictions vs true data)
+def visualize_past_horizon(frequencies):
+    
+    
+    
+    #------------------ DATA FOR EVALUATION -------------------------#
+    # from 2009 but i plot from 2010 just for observation 
+    dseries = pd.DataFrame(frequencies['daily'][1].loc['2009-12-31':])
+    wseries = pd.DataFrame(frequencies['weekly'][1].loc['2009-12-27':])
+    mseries = pd.DataFrame(frequencies['monthly'][1].loc[:'2009-12-31':])
+    qseries = pd.DataFrame(frequencies['quarterly'][1].loc[:'2009-12-31':])
+    yseries = pd.DataFrame(frequencies['yearly'][1].loc[:'2009-12-31':])
+    #------------------------------------------------------------------#
+ 
+    # Begin by selecting 20% of the datasets for each different frequency 
+    # create a dictionary to retrieve each series for prediction , it also has the the horizon so we know how many values to plot/visualize
+    # in general we plot the actual values vs predicted horizon values 
+    
+    pred_dict = {'daily' : (dseries, 14),
+                 'weekly' : (wseries,13),
+                 'monthly' : (mseries,18),
+                 'quarterly' : (qseries,8),
+                 'yearly' : (yseries,6) }
+    
+    
+    
+    # define the currencies
+    series = frequencies['daily'][1]
+    curs = series.columns
+    
+
+    for cur in curs:
+       
+       y_path = glob.glob(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/predictions/scnn/multi_step/slide', cur ,"**/*.csv"),recursive=True)
+      
+       
+       
+       for p in y_path :
+           #get the frequenxy so i know which dataset to plot with 
+           freq = p.split('/')[-3]
+           series_length = p.split('/')[-2]
+           
+         
+           # i will pick for history a history of 3*horizons (can also be customized )
+           # DOES IT NEED TO BE TRANSPOSED ? 
+           horizon = pred_dict[freq][1]
+           history = pred_dict[freq][0][cur][: horizon * 2].transpose()
+           selected_index = history[:horizon].index 
+           
+           
+           # read model predictions and set the predictions index same as the data index to align the true values with the predictions 
+           y_model_1 = pd.read_csv(p, header=0, index_col=0).iloc[:,: horizon].transpose()
+           y_model_1.index = selected_index
+           
+           
+       
+           fig = plt.figure()
+           plt.plot(history,'o-',color ='green',label='original history')
+           plt.plot(y_model_1,'o-',color='purple',label = 'predictions')
+           plt.title(f'FORECASTING with currency : {cur} , frequency : {freq}, training_length : {series_length}' )
+           plt.xticks(rotation=90)
+           plt.legend()
+           
+           # save images 
+           if not (os.path.exists('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide')):
+                   os.makedirs('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide')
+           plt.savefig(os.path.join('/home/st_ko/Desktop/Deep_Learning_Project/neural-networks-project/visualizations/scnn/multi_step/slide', 
+                                    cur +'_' + freq + '_' + str(series_length) + '.png'))
+           plt.close()
       
 
 
@@ -128,7 +197,9 @@ if __name__=="__main__":
         frequencies[freq_name] = (frequencies[freq_name],data)
         
         
-    # plot the predictions against the history 
-    history_vs_prediction(frequencies[freq_name][1].columns)
+    #-------------- PLOT UNKNOWN FUTURE VALUES -----------------#
+    #visualize_future_horizon(frequencies['daily'][1].columns)
     
+    #-------------- PLOT EVALUATION PLOTS, PREDICTED DATA VS ACTUAL DATA-----#
+    visualize_past_horizon(frequencies)
     
